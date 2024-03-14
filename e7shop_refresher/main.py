@@ -4,7 +4,7 @@ import time
 
 import keyboard
 import win32api
-from pyautogui import screenshot
+from pyautogui import locateOnScreen, screenshot
 from win32.lib import win32con
 
 
@@ -20,20 +20,47 @@ def click(x, y):
 # filename = "screenshot.png"
 # sc.save(os.path.join(root_folder, filename))
 
-# while 1:
-#     if pyautogui.locateOnScreen('bookmark.png', region=(150,175,350,600), grayscale=True, confidence=0.8) != None:
-#         print("I can see a bookmark")
-#         time.sleep(0.5)
-#     else:
-#         print("I am unable to see a bookmark")
-#         time.sleep(0.5)
-
 
 def main():
-    print("Hello Main")
+    should_continue = True
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    bookmark_image_path = os.path.join(current_dir, "shop_products", "bookmark.png")
+    mystic_medal_image_path = os.path.join(
+        current_dir, "shop_products", "mystic_medal.png"
+    )
+    while should_continue:
+        try:
+            position = locateOnScreen(
+                bookmark_image_path, grayscale=True, confidence=0.7
+            )
+            if position is not None:
+                print("I can see a bookmark")
+                print(position)
+                click(position.left + 40, position.top + 40)
+        except Exception:
+            print("I am unable to see a bookmark")
+
+        try:
+            position = locateOnScreen(
+                mystic_medal_image_path, grayscale=True, confidence=0.7
+            )
+            if position is not None:
+                print("I can see a Mystic Medal")
+                print(position.left)
+                print(position.top)
+                click(position.left + 40, position.top + 40)
+        except Exception:
+            print("I am unable to see a Mystic Medal")
+
+        should_continue = False
 
 
 if __name__ == "__main__":
+    # The shop should be open
+
+    # The bot should register the amount of money & skystones available (Resources) and maybe ask the user how much should it use, but it definetly MUST stop once any of those resources are depleted or the amount inputed is reached.
+
+    # The steps will be to:
     # - Check the first 2 items in the shop to see if they are bookmarks or medallions (Products)
     #     - If any of the first 2 items are a Product, we'll check our Resources and if available, we'll buy them
     # - Scroll the shop to see the remaining 4 items

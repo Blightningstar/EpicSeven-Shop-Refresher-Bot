@@ -2,57 +2,138 @@ import os
 import random
 import time
 
-import keyboard
-import win32api
-from pyautogui import locateOnScreen, screenshot
-from win32.lib import win32con
+import cv2
+import numpy as np
+import uiautomator2 as u2
+from icecream import ic
+from PIL import Image
 
 
-def click(x, y):
-    win32api.SetCursorPos((x, y))
-    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
-    time.sleep(0.1)
-    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
+class EpicSevenBot:
+    def __init__(self):
+        self.bookmark_image_path = ""
+        self.bookmark_buy_confirmation = ""
+        self.mystic_medal_image_path = ""
+        self.mystic_medal_buy_confirmation = ""
+        self.should_continue = True
+        self.android_instance = None
 
-
-# sc = screenshot(region=(0,0,100,100))
-# root_folder = os.getcwd()
-# filename = "screenshot.png"
-# sc.save(os.path.join(root_folder, filename))
-
-
-def main():
-    should_continue = True
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    bookmark_image_path = os.path.join(current_dir, "shop_products", "bookmark.png")
-    mystic_medal_image_path = os.path.join(
-        current_dir, "shop_products", "mystic_medal.png"
-    )
-    while should_continue:
+    def load_resources(self):
         try:
-            position = locateOnScreen(
-                bookmark_image_path, grayscale=True, confidence=0.7
-            )
-            if position is not None:
-                print("I can see a bookmark")
-                print(position)
-                click(position.left + 40, position.top + 40)
-        except Exception:
-            print("I am unable to see a bookmark")
+            print("Loading the resources ...", end="\r")
+            current_dir = os.path.dirname(os.path.abspath(__file__))
 
+            self.bookmark_image_path = os.path.join(
+                current_dir, "shop_products", "bookmark_shop_entry.png"
+            )
+
+            self.bookmark_buy_confirmation = os.path.join(
+                current_dir, "shop_products", "bookmark_buy_confirmation.png"
+            )
+
+            self.mystic_medal_image_path = os.path.join(
+                current_dir, "shop_products", "mystic_medal.png"
+            )
+
+            self.mystic_medal_image_path = os.path.join(
+                current_dir, "shop_products", "mystic_medal_buy_confirmation.png"
+            )
+
+            print("Resources loaded successfully!")
+        except Exception as e:
+            print(f"There was an error loading the resources: {e}")
+
+    def connect_to_android(self):
         try:
-            position = locateOnScreen(
-                mystic_medal_image_path, grayscale=True, confidence=0.7
-            )
-            if position is not None:
-                print("I can see a Mystic Medal")
-                print(position.left)
-                print(position.top)
-                click(position.left + 40, position.top + 40)
-        except Exception:
-            print("I am unable to see a Mystic Medal")
+            # Connect to BlueStacks Emulator that has ADB enabled
+            print("Connecting to Bluestack instance ...", end="\r")
+            self.android_instance = u2.connect()
+            bluestack_5 = self.android_instance.info
 
-        should_continue = False
+            if bluestack_5["currentPackageName"] != "com.stove.epic7.google":
+                raise Exception(
+                    "Epic Seven is not opened, please try again after opening the app."
+                )
+
+            print("Connected to BlueStacks successfully!")
+            return True
+        except Exception as e:
+            print(f"Failed to connect to BlueStacks: {e}")
+            return False
+
+    def match_android_screen_to_image(self, search_image_path):
+        try:
+            # Capture a screenshot of the Android screen
+            screenshot = self.android_instance.screenshot(format="opencv")
+            # Load the image to search for
+            image_to_search = cv2.imread(search_image_path)
+            # Search for the presence of the image within the captured screenshot
+            result = cv2.matchTemplate(
+                screenshot, image_to_search, cv2.TM_CCOEFF_NORMED
+            )
+            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+            # See if confidance range is 80% or higher
+            if max_val > 0.8:
+                x, y = max_loc  # Get the coordinates of the matched image
+                h, w = image_to_search.shape[
+                    :-1
+                ]  # Get height and width of the matched image
+                # Calculate lower right corner coordinates, to be able to click the buy button
+                x2, y2 = x + w, y + h
+                return True, x2, y2
+            else:
+                print("Resource not found")
+                return False, 0, 0
+        except Exception as e:
+            print(f"There was an error: {e}")
+            return False, 0, 0
+
+    def buy_resource(self, x, y):
+        # We open the resource buying confirmation menu
+        self.android_instance.click(x, y)
+
+        match_found, x, y = self.match_android_screen_to_image(
+            self.bookmark_buy_confirmation
+        )
+        if match_found:
+            self.android_instance.click(x, y)
+        else:
+            print("I am unable to see the buy confirmation!")
+
+    def find_bookmarks(self):
+        # Search for Bookmarks
+        return self.match_android_screen_to_image(self.bookmark_image_path)
+
+    def find_mystic_medals(self):
+        # Search for Mystic Medals
+        return self.match_android_screen_to_image(self.mystic_medal_image_path)
+
+    def get_resources(self, bookmarks=True, mystic_medals=True):
+        if bookmarks:
+            # Search for Bookmarks
+            result, x, y = self.find_bookmarks()
+            if result:
+                self.buy_resource(x, y)
+        if mystic_medals:
+            # Search for Mystic Medals
+            result, x, y = self.find_mystic_medals()
+            if result:
+                self.buy_resource(x, y)
+
+    def secret_shop_bot(self):
+        while self.should_continue:
+            self.get_resources()
+            self.android_instance(scrollable=True).fling.vert.forward(steps=100)
+            self.get_resources()
+            self.should_continue = False
+
+    def main(self):
+        print("Starting the Epic 7 Secret Shop Refresher Bot ...")
+        self.load_resources()
+        time.sleep(3.0)
+        self.should_continue = self.connect_to_android()
+        self.secret_shop_bot()
 
 
 if __name__ == "__main__":
@@ -67,4 +148,5 @@ if __name__ == "__main__":
     #     - If any of the remaining 4 items are a Product, we'll check our Resources and if available, we'll buy them
     # - We'll hit the Refresh Shop Button if skystones are available then we'll hit confirm
     # - The process continues until either we ran out of money or skystones or the program finishes.
-    main()
+    bot = EpicSevenBot()
+    bot.main()

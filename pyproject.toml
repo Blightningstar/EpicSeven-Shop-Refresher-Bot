@@ -7,10 +7,8 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pywin32 = { version = "^306", platform = "win32", markers = "platform_system == 'Windows'" }
-keyboard = "^0.13.5"
-PyAutoGUI = "^0.9.54"
 opencv-python = "^4.9.0.80"
+uiautomator2 = "^2.16.25"
 
 [tool.poetry.group.dev.dependencies]
 icecream = "^2.1.3"

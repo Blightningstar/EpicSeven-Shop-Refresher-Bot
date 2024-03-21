@@ -11,12 +11,22 @@ from PIL import Image
 
 class EpicSevenBot:
     def __init__(self):
+
+        # All the variables for images paths
         self.bookmark_image_path = ""
         self.bookmark_buy_confirmation = ""
         self.mystic_medal_image_path = ""
         self.mystic_medal_buy_confirmation = ""
+        self.refresh_store_button = ""
+        self.refresh_store_confirmation = ""
+        self.no_skystones_left = ""
+        self.in_secret_shop = ""
+
+        # All configuration values for the bot to work
         self.should_continue = True
         self.android_instance = None
+        self.buy_bookmarks = True
+        self.buy_mystic_medals = True
 
     def load_resources(self):
         try:
@@ -37,6 +47,22 @@ class EpicSevenBot:
 
             self.mystic_medal_image_path = os.path.join(
                 current_dir, "shop_products", "mystic_medal_buy_confirmation.png"
+            )
+
+            self.refresh_store_button = os.path.join(
+                current_dir, "shop_products", "refresh_button.png"
+            )
+
+            self.refresh_store_confirmation = os.path.join(
+                current_dir, "shop_products", "refresh_store_confirmation.png"
+            )
+
+            self.no_skystones_left = os.path.join(
+                current_dir, "shop_products", "no_skystones_left.png"
+            )
+
+            self.in_secret_shop = os.path.join(
+                current_dir, "shop_products", "secret_shop.png"
             )
 
             print("Resources loaded successfully!")
@@ -83,7 +109,7 @@ class EpicSevenBot:
                 x2, y2 = x + w, y + h
                 return True, x2, y2
             else:
-                print("Resource not found")
+                print(f"Resource at {search_image_path} not found on screen.")
                 return False, 0, 0
         except Exception as e:
             print(f"There was an error: {e}")
@@ -121,15 +147,55 @@ class EpicSevenBot:
             if result:
                 self.buy_resource(x, y)
 
-    def secret_shop_bot(self):
-        while self.should_continue:
-            self.get_resources()
-            self.android_instance(scrollable=True).fling.vert.forward(steps=100)
-            self.get_resources()
+    def refresh_store(self):
+        match_found, x, y = self.match_android_screen_to_image(
+            self.refresh_store_button
+        )
+        if not match_found:
+            print("I am unable to see the refresh button!")
+        else:
+            self.android_instance.click(x, y)
+            time.sleep(0.3)
+            match_found, x, y = self.match_android_screen_to_image(
+                self.refresh_store_confirmation
+            )
+            if not match_found:
+                print("I am unable to see the refresh confirmation pop up!")
+            else:
+                self.android_instance.click(x, y)
+                time.sleep(0.3)
+                match_found, x, y = self.match_android_screen_to_image(
+                    self.no_skystones_left
+                )
+                if match_found:
+                    print("You're out of Skystones!")
+                    self.should_continue = False
+
+    def check_if_inside_secret_shop(self):
+        match_found, _, _ = self.match_android_screen_to_image(self.in_secret_shop)
+        if not match_found:
+            print("This bot only works inside the tabern's secret shop!")
             self.should_continue = False
+        else:
+            print("Hi Garo, I'll be ordering the usual!")
+
+    def secret_shop_bot(self):
+        self.check_if_inside_secret_shop()
+        while self.should_continue:
+            self.get_resources(self.buy_bookmarks, self.buy_mystic_medals)
+            self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
+            self.get_resources(self.buy_bookmarks, self.buy_mystic_medals)
+            self.refresh_store()
+            self.should_continue = False
+        print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
+
+    def get_configuration_info(self):
+        self.buy_bookmarks = True
+        self.buy_mystic_medals = True
 
     def main(self):
         print("Starting the Epic 7 Secret Shop Refresher Bot ...")
+        self.get_configuration_info()
         self.load_resources()
         time.sleep(3.0)
         self.should_continue = self.connect_to_android()

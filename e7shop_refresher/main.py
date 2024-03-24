@@ -22,7 +22,6 @@ class EpicSevenBot:
         self.refresh_store_confirmation = ""
         self.no_skystones_left = ""
         self.in_secret_shop = ""
-        self.own_gold = ""
 
         # All configuration values for the bot to work
         self.should_continue = True
@@ -81,8 +80,6 @@ class EpicSevenBot:
                 current_dir, "shop_products", "secret_shop.png"
             )
 
-            self.own_gold = os.path.join(current_dir, "shop_products", "own_gold.png")
-
             print("Image resources loaded successfully!")
         except Exception as e:
             print(f"There was an error loading the resources: {e}")
@@ -109,12 +106,11 @@ class EpicSevenBot:
             print(f"Failed to connect to BlueStacks: {e}")
             return False
 
-    def extract_numbers_from_image(self, image_path):
+    def extract_numbers_from_image(self, resource_image):
         """
         This method reads the screen next to an image and returns the text read.
         """
-        img = Image.open(image_path)
-        numbers = pytesseract.image_to_string(img)
+        numbers = pytesseract.image_to_string(resource_image)
         return numbers
 
     def match_android_screen_to_image(self, search_image_path):
@@ -167,11 +163,18 @@ class EpicSevenBot:
         """
         This method checks if spending limit has been reached for Skystones or Coins.
         """
-        match_found, _, _ = self.match_android_screen_to_image(self.own_gold)
-        if not match_found:
-            print("weird")
-        else:
-            print("Good")
+        screenshot = self.android_instance.screenshot(format="opencv")
+        screenshot_image = Image.fromarray(screenshot)
+        # Here is region in which the account's Coins and Skystones are located
+        region = (
+            980,  # Initial X
+            0,  # Initial Y
+            1300,  # Final X
+            62,  # Final Y
+        )
+        # Can check this with cropped_image.show()
+        cropped_image = screenshot_image.crop(region)
+        print(self.extract_numbers_from_image(cropped_image))
 
     def get_resources(self):
         """
@@ -181,7 +184,7 @@ class EpicSevenBot:
             # Search for Bookmarks
             result, x, y = self.match_android_screen_to_image(self.bookmark_image_path)
             if result:
-                self.check_skystones_and_coins()
+                # self.check_skystones_and_coins()
                 self.buy_resource(x, y)
         if self.buy_mystic_medals:
             # Search for Mystic Medals
@@ -189,7 +192,7 @@ class EpicSevenBot:
                 self.mystic_medal_image_path
             )
             if result:
-                self.check_skystones_and_coins()
+                # self.check_skystones_and_coins()
                 self.buy_resource(x, y)
 
     def refresh_store(self):
@@ -325,7 +328,7 @@ class EpicSevenBot:
             default_value=True,
         )
         self.amount_skystones_to_spent = self.get_user_input(
-            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones)]:  ",
+            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
             default_input="",
             default_value="-1",
         )
@@ -343,7 +346,8 @@ class EpicSevenBot:
             self.load_image_resources()
             self.check_if_inside_secret_shop()
             time.sleep(3.0)
-            self.secret_shop_bot()
+            # self.secret_shop_bot()
+            self.check_skystones_and_coins()
 
 
 if __name__ == "__main__":

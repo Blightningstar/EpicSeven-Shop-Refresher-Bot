@@ -34,7 +34,17 @@ class EpicSevenBot:
         self.amount_skystones_to_spent = None
         self.amount_coins_to_spent = None
 
+    def show_shopping_report(self):
+        """
+        This method prints all the shopping statistics.
+        """
+        pass
+
     def load_image_resources(self):
+        """
+        This method loads all the images required for the script
+        to match on the android instance during runtime.
+        """
         try:
             print("Loading the image resources ...", end="\r")
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +89,9 @@ class EpicSevenBot:
             self.should_continue = False
 
     def connect_to_android(self):
+        """
+        This method handles the connection of the script to android instance.
+        """
         try:
             # Connect to BlueStacks Emulator that has ADB enabled
             print("Connecting to Bluestack instance ...", end="\r")
@@ -97,11 +110,17 @@ class EpicSevenBot:
             return False
 
     def extract_numbers_from_image(self, image_path):
+        """
+        This method reads the screen next to an image and returns the text read.
+        """
         img = Image.open(image_path)
         numbers = pytesseract.image_to_string(img)
         return numbers
 
     def match_android_screen_to_image(self, search_image_path):
+        """
+        This method matches the image at search_image_path and finds it in the E7 screen.
+        """
         try:
             # Capture a screenshot of the Android screen
             screenshot = self.android_instance.screenshot(format="opencv")
@@ -130,6 +149,9 @@ class EpicSevenBot:
             return False, 0, 0
 
     def buy_resource(self, x, y):
+        """
+        This method handles the logic for buying bookmarks and mystic medals.
+        """
         # We open the resource buying confirmation menu
         self.android_instance.click(x, y)
 
@@ -141,27 +163,27 @@ class EpicSevenBot:
         else:
             print("I am unable to see the buy confirmation!")
 
-    def find_bookmarks(self):
-        # Search for Bookmarks
-        return self.match_android_screen_to_image(self.bookmark_image_path)
-
-    def find_mystic_medals(self):
-        # Search for Mystic Medals
-        return self.match_android_screen_to_image(self.mystic_medal_image_path)
-
     def get_resources(self):
+        """
+        This method handles the logic for searching/buying bookmarks and mystic medals.
+        """
         if self.buy_bookmarks:
             # Search for Bookmarks
-            result, x, y = self.find_bookmarks()
+            result, x, y = self.match_android_screen_to_image(self.bookmark_image_path)
             if result:
                 self.buy_resource(x, y)
         if self.buy_mystic_medals:
             # Search for Mystic Medals
-            result, x, y = self.find_mystic_medals()
+            result, x, y = self.match_android_screen_to_image(
+                self.mystic_medal_image_path
+            )
             if result:
                 self.buy_resource(x, y)
 
     def refresh_store(self):
+        """
+        This method handles the logic for refreshing the store.
+        """
         match_found, x, y = self.match_android_screen_to_image(
             self.refresh_store_button
         )
@@ -186,6 +208,9 @@ class EpicSevenBot:
                     self.should_continue = False
 
     def check_if_inside_secret_shop(self):
+        """
+        This method stops execution of the script if the E7 game is not inside Garo's Secret Shop.
+        """
         match_found, _, _ = self.match_android_screen_to_image(self.in_secret_shop)
         if not match_found:
             print("This bot only works inside the tabern's secret shop!")
@@ -194,6 +219,9 @@ class EpicSevenBot:
             print("Hi Garo, I'll be ordering the usual!")
 
     def secret_shop_bot(self):
+        """
+        This method contains the logic for matching, clicking, buying and refreshing the shop.
+        """
         while self.should_continue:
             self.get_resources()
             self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
@@ -202,6 +230,9 @@ class EpicSevenBot:
         print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
 
     def check_skystones_and_coins(self):
+        """
+        This method checks if spending limit has been reached for Skystones or Coins.
+        """
         match_found, _, _ = self.match_android_screen_to_image(self.own_gold)
         if not match_found:
             print("weird")
@@ -216,6 +247,9 @@ class EpicSevenBot:
         default_input=None,
         default_value=None,
     ):
+        """
+        This method handles user inputs for an amazing and smooth UX.
+        """
         incorrect_input = True
         while incorrect_input:
             user_input = input(prompt).lower()
@@ -240,6 +274,9 @@ class EpicSevenBot:
                 return user_input
 
     def check_stored_android_port(self):
+        """
+        This method allows to handle preserving the ADB_port variable throughout different script runs.
+        """
         with open(self.android_port_txt_path, "w+") as file:
             first_line = file.readline().strip()
             if first_line.startswith("ADB_port="):
@@ -262,6 +299,10 @@ class EpicSevenBot:
                     print("ADB Port Stored!")
 
     def get_initial_user_configuration_info(self):
+        """
+        This method allows the user to go through the configuration menu for the
+        script runtime decisions returning its position on the android screen.
+        """
         self.check_stored_android_port()
         self.buy_bookmarks = self.get_user_input(
             prompt="Do you want to buy Bookmarks? (y/n) [y]:  ",

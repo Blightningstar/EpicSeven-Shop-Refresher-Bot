@@ -4,6 +4,7 @@ import time
 
 import cv2
 import numpy as np
+import pytesseract
 import uiautomator2 as u2
 from icecream import ic
 from PIL import Image
@@ -21,16 +22,21 @@ class EpicSevenBot:
         self.refresh_store_confirmation = ""
         self.no_skystones_left = ""
         self.in_secret_shop = ""
+        self.own_gold = ""
 
         # All configuration values for the bot to work
         self.should_continue = True
         self.android_instance = None
+        self.android_port = 8000
+        self.android_port_txt_path = "android_ADB_port.txt"
         self.buy_bookmarks = True
         self.buy_mystic_medals = True
+        self.amount_skystones_to_spent = None
+        self.amount_coins_to_spent = None
 
-    def load_resources(self):
+    def load_image_resources(self):
         try:
-            print("Loading the resources ...", end="\r")
+            print("Loading the image resources ...", end="\r")
             current_dir = os.path.dirname(os.path.abspath(__file__))
 
             self.bookmark_image_path = os.path.join(
@@ -42,10 +48,10 @@ class EpicSevenBot:
             )
 
             self.mystic_medal_image_path = os.path.join(
-                current_dir, "shop_products", "mystic_medal.png"
+                current_dir, "shop_products", "mystic_medal_shop_entry.png"
             )
 
-            self.mystic_medal_image_path = os.path.join(
+            self.mystic_medal_buy_confirmation = os.path.join(
                 current_dir, "shop_products", "mystic_medal_buy_confirmation.png"
             )
 
@@ -65,15 +71,18 @@ class EpicSevenBot:
                 current_dir, "shop_products", "secret_shop.png"
             )
 
-            print("Resources loaded successfully!")
+            self.own_gold = os.path.join(current_dir, "shop_products", "own_gold.png")
+
+            print("Image resources loaded successfully!")
         except Exception as e:
             print(f"There was an error loading the resources: {e}")
+            self.should_continue = False
 
     def connect_to_android(self):
         try:
             # Connect to BlueStacks Emulator that has ADB enabled
             print("Connecting to Bluestack instance ...", end="\r")
-            self.android_instance = u2.connect()
+            self.android_instance = u2.connect(f"127.0.0.1:{self.android_port}")
             bluestack_5 = self.android_instance.info
 
             if bluestack_5["currentPackageName"] != "com.stove.epic7.google":
@@ -86,6 +95,11 @@ class EpicSevenBot:
         except Exception as e:
             print(f"Failed to connect to BlueStacks: {e}")
             return False
+
+    def extract_numbers_from_image(self, image_path):
+        img = Image.open(image_path)
+        numbers = pytesseract.image_to_string(img)
+        return numbers
 
     def match_android_screen_to_image(self, search_image_path):
         try:
@@ -135,13 +149,13 @@ class EpicSevenBot:
         # Search for Mystic Medals
         return self.match_android_screen_to_image(self.mystic_medal_image_path)
 
-    def get_resources(self, bookmarks=True, mystic_medals=True):
-        if bookmarks:
+    def get_resources(self):
+        if self.buy_bookmarks:
             # Search for Bookmarks
             result, x, y = self.find_bookmarks()
             if result:
                 self.buy_resource(x, y)
-        if mystic_medals:
+        if self.buy_mystic_medals:
             # Search for Mystic Medals
             result, x, y = self.find_mystic_medals()
             if result:
@@ -180,26 +194,109 @@ class EpicSevenBot:
             print("Hi Garo, I'll be ordering the usual!")
 
     def secret_shop_bot(self):
-        self.check_if_inside_secret_shop()
         while self.should_continue:
-            self.get_resources(self.buy_bookmarks, self.buy_mystic_medals)
+            self.get_resources()
             self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
-            self.get_resources(self.buy_bookmarks, self.buy_mystic_medals)
+            self.get_resources()
             self.refresh_store()
-            self.should_continue = False
         print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
 
-    def get_configuration_info(self):
-        self.buy_bookmarks = True
-        self.buy_mystic_medals = True
+    def check_skystones_and_coins(self):
+        match_found, _, _ = self.match_android_screen_to_image(self.own_gold)
+        if not match_found:
+            print("weird")
+        else:
+            print("Good")
+
+    def get_user_input(
+        self,
+        prompt,
+        prompt_options=None,
+        prompt_option_values=None,
+        default_input=None,
+        default_value=None,
+    ):
+        incorrect_input = True
+        while incorrect_input:
+            user_input = input(prompt).lower()
+            # User pressed enter and choose the default value
+            if (
+                user_input == ""
+                and default_input is not None
+                and default_value is not None
+            ):
+                incorrect_input = False
+                return default_value
+            if prompt_options:
+                # User inputted one of the prompt_options
+                if user_input in prompt_options:
+                    incorrect_input = False
+                    if prompt_option_values:
+                        return prompt_option_values[prompt_options.index(user_input)]
+                    else:
+                        return user_input
+            else:
+                incorrect_input = False
+                return user_input
+
+    def check_stored_android_port(self):
+        with open(self.android_port_txt_path, "w+") as file:
+            first_line = file.readline().strip()
+            if first_line.startswith("ADB_port="):
+                self.android_port = first_line.split("=")[1]
+                print("Stored ADB Port found: ", self.android_port)
+            else:
+                file.seek(0)
+                should_store_ADB_port = self.get_user_input(
+                    prompt="I see you do not have your ADB port stored yet. You want to store it? (y/n) [y]:  ",
+                    prompt_options=["y", "n"],
+                    prompt_option_values=[True, False],
+                    default_input="y",
+                    default_value=True,
+                )
+                self.android_port = self.get_user_input(
+                    prompt="In which port is your Android instance ADB running?:  ",
+                )
+                if should_store_ADB_port:
+                    file.write(f"ADB_port={self.android_port}\n")
+                    print("ADB Port Stored!")
+
+    def get_initial_user_configuration_info(self):
+        self.check_stored_android_port()
+        self.buy_bookmarks = self.get_user_input(
+            prompt="Do you want to buy Bookmarks? (y/n) [y]:  ",
+            prompt_options=["y", "n"],
+            prompt_option_values=[True, False],
+            default_input="y",
+            default_value=True,
+        )
+        self.buy_mystic_medals = self.get_user_input(
+            prompt="Do you want to buy Mystic Medals? (y/n) [y]:  ",
+            prompt_options=["y", "n"],
+            prompt_option_values=[True, False],
+            default_input="y",
+            default_value=True,
+        )
+        self.amount_skystones_to_spent = self.get_user_input(
+            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones)]:  ",
+            default_input="",
+            default_value="-1",
+        )
+        self.amount_coins_to_spent = self.get_user_input(
+            prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
+            default_input="",
+            default_value="-1",
+        )
 
     def main(self):
-        print("Starting the Epic 7 Secret Shop Refresher Bot ...")
-        self.get_configuration_info()
-        self.load_resources()
-        time.sleep(3.0)
+        print("Welcome to the Epic 7 Secret Shop Refresher Bot!")
+        self.get_initial_user_configuration_info()
         self.should_continue = self.connect_to_android()
-        self.secret_shop_bot()
+        if self.should_continue:
+            self.load_image_resources()
+            self.check_if_inside_secret_shop()
+            time.sleep(3.0)
+            self.secret_shop_bot()
 
 
 if __name__ == "__main__":

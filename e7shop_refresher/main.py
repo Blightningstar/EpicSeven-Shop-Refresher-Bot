@@ -163,6 +163,16 @@ class EpicSevenBot:
         else:
             print("I am unable to see the buy confirmation!")
 
+    def check_skystones_and_coins(self):
+        """
+        This method checks if spending limit has been reached for Skystones or Coins.
+        """
+        match_found, _, _ = self.match_android_screen_to_image(self.own_gold)
+        if not match_found:
+            print("weird")
+        else:
+            print("Good")
+
     def get_resources(self):
         """
         This method handles the logic for searching/buying bookmarks and mystic medals.
@@ -171,6 +181,7 @@ class EpicSevenBot:
             # Search for Bookmarks
             result, x, y = self.match_android_screen_to_image(self.bookmark_image_path)
             if result:
+                self.check_skystones_and_coins()
                 self.buy_resource(x, y)
         if self.buy_mystic_medals:
             # Search for Mystic Medals
@@ -178,6 +189,7 @@ class EpicSevenBot:
                 self.mystic_medal_image_path
             )
             if result:
+                self.check_skystones_and_coins()
                 self.buy_resource(x, y)
 
     def refresh_store(self):
@@ -227,17 +239,8 @@ class EpicSevenBot:
             self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
             self.get_resources()
             self.refresh_store()
+        self.show_shopping_report()
         print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
-
-    def check_skystones_and_coins(self):
-        """
-        This method checks if spending limit has been reached for Skystones or Coins.
-        """
-        match_found, _, _ = self.match_android_screen_to_image(self.own_gold)
-        if not match_found:
-            print("weird")
-        else:
-            print("Good")
 
     def get_user_input(
         self,
@@ -277,13 +280,16 @@ class EpicSevenBot:
         """
         This method allows to handle preserving the ADB_port variable throughout different script runs.
         """
-        with open(self.android_port_txt_path, "w+") as file:
-            first_line = file.readline().strip()
-            if first_line.startswith("ADB_port="):
-                self.android_port = first_line.split("=")[1]
-                print("Stored ADB Port found: ", self.android_port)
-            else:
-                file.seek(0)
+        port_found = False
+        if os.path.exists(self.android_port_txt_path):
+            with open(self.android_port_txt_path, "r") as file:
+                first_line = file.readline().strip()
+                if first_line.startswith("ADB_port="):
+                    self.android_port = first_line.split("=")[1]
+                    port_found = True
+                    print("Stored ADB Port found: ", self.android_port)
+        if not os.path.exists(self.android_port_txt_path) or not port_found:
+            with open(self.android_port_txt_path, "w") as file:
                 should_store_ADB_port = self.get_user_input(
                     prompt="I see you do not have your ADB port stored yet. You want to store it? (y/n) [y]:  ",
                     prompt_options=["y", "n"],

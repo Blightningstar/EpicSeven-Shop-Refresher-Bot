@@ -9,7 +9,7 @@ package-mode = false
 python = "^3.11"
 opencv-python = "^4.9.0.80"
 uiautomator2 = "^2.16.25"
-pytesseract = "^0.3.10"
+easyocr = "^1.7.1"
 
 [tool.poetry.group.dev.dependencies]
 icecream = "^2.1.3"

@@ -1,10 +1,9 @@
 import os
-import random
 import time
 
 import cv2
+import easyocr
 import numpy as np
-import pytesseract
 import uiautomator2 as u2
 from icecream import ic
 from PIL import Image
@@ -26,12 +25,31 @@ class EpicSevenBot:
         # All configuration values for the bot to work
         self.should_continue = True
         self.android_instance = None
+        self.ocr_instance = easyocr.Reader(["en"], gpu=False)
         self.android_port = 8000
         self.android_port_txt_path = "android_ADB_port.txt"
         self.buy_bookmarks = True
         self.buy_mystic_medals = True
-        self.amount_skystones_to_spent = None
-        self.amount_coins_to_spent = None
+        self.max_amount_skystones_to_spent = None
+        self.max_amount_coins_to_spent = None
+        self.current_coins = None
+        self.current_skystones = None
+        self.BOOKMARK_PRICE = 184_000
+        self.AMOUNT_BOOKMARK_PER_BUY = 5
+        self.MYSTIC_MEDAL_PRICE = 280_000
+        self.AMOUNT_MYSTIC_MEDAL_PER_BUY = 50
+        self.SKYSTONES_PER_REFRESH = 3
+
+        # All the report variables
+        self.bookmarks_bought = 0
+        self.mystic_medals_bought = 0
+        self.refreshes_performed = 0
+        self.skystones_spent = 0
+        self.coins_spent = 0
+        self.final_ratio_bookmarks = 0
+        self.final_ratio_mystic_medals = 0
+        self.initial_amount_skystones = 0
+        self.initial_amount_coins = 0
 
     def show_shopping_report(self):
         """
@@ -110,7 +128,7 @@ class EpicSevenBot:
         """
         This method reads the screen next to an image and returns the text read.
         """
-        numbers = pytesseract.image_to_string(resource_image)
+        numbers = self.ocr_instance.readtext(resource_image)
         return numbers
 
     def match_android_screen_to_image(self, search_image_path):
@@ -144,25 +162,33 @@ class EpicSevenBot:
             print(f"There was an error: {e}")
             return False, 0, 0
 
-    def buy_resource(self, x, y):
+    def buy_resource(self, x, y, resource="bookmark"):
         """
         This method handles the logic for buying bookmarks and mystic medals.
         """
         # We open the resource buying confirmation menu
         self.android_instance.click(x, y)
 
-        match_found, x, y = self.match_android_screen_to_image(
+        buy_confirmation = (
             self.bookmark_buy_confirmation
+            if resource == "bookmark"
+            else self.mystic_medal_buy_confirmation
         )
+
+        match_found, x, y = self.match_android_screen_to_image(buy_confirmation)
+
         if match_found:
             self.android_instance.click(x, y)
+            return True
         else:
             print("I am unable to see the buy confirmation!")
+            return False
 
-    def check_skystones_and_coins(self):
+    def update_current_skytones_and_coins(self, initial_setup=False):
         """
         This method checks if spending limit has been reached for Skystones or Coins.
         """
+        screenshot_path = "e7shop_refresher\\screenshots\\screenshot.png"
         screenshot = self.android_instance.screenshot(format="opencv")
         screenshot_image = Image.fromarray(screenshot)
         # Here is region in which the account's Coins and Skystones are located
@@ -174,7 +200,13 @@ class EpicSevenBot:
         )
         # Can check this with cropped_image.show()
         cropped_image = screenshot_image.crop(region)
-        print(self.extract_numbers_from_image(cropped_image))
+        cropped_image.save(screenshot_path)
+        numbers = self.extract_numbers_from_image(screenshot_path)
+        self.current_coins = int(numbers[0][1].replace(",", ""))
+        self.current_skystones = int(numbers[1][1].replace(",", ""))
+        if initial_setup:
+            self.initial_amount_coins = self.current_coins
+            self.initial_amount_skystones = self.current_skystones
 
     def get_resources(self):
         """
@@ -184,43 +216,82 @@ class EpicSevenBot:
             # Search for Bookmarks
             result, x, y = self.match_android_screen_to_image(self.bookmark_image_path)
             if result:
-                # self.check_skystones_and_coins()
-                self.buy_resource(x, y)
+                self.update_current_skytones_and_coins()
+                if (
+                    self.max_amount_coins_to_spent == -1
+                    and self.max_amount_coins_to_spent
+                    >= self.coins_spent + self.BOOKMARK_PRICE
+                ):
+                    if self.current_coins >= self.BOOKMARK_PRICE:
+                        if self.buy_resource(x, y):
+                            self.bookmarks_bought += self.AMOUNT_BOOKMARK_PER_BUY
+                            self.coins_spent += self.BOOKMARK_PRICE
+                    else:
+                        self.should_continue = False
+                        print("You don't have any Coins left!")
+                else:
+                    self.should_continue = False
+                    print(f"Max amount of {self.coins_spent} Coins to spend reached!")
         if self.buy_mystic_medals:
             # Search for Mystic Medals
             result, x, y = self.match_android_screen_to_image(
                 self.mystic_medal_image_path
             )
             if result:
-                # self.check_skystones_and_coins()
-                self.buy_resource(x, y)
+                self.update_current_skytones_and_coins()
+                # If there is no limit to spend coins (-1) or we haven't reached the max amount of
+                if (
+                    self.max_amount_coins_to_spent == -1
+                    or self.max_amount_coins_to_spent
+                    >= self.coins_spent + self.MYSTIC_MEDAL_PRICE
+                ):
+                    if self.current_coins >= self.MYSTIC_MEDAL_PRICE:
+                        if self.buy_resource(x, y, "mystic_medal"):
+                            self.mystic_medals_bought += (
+                                self.AMOUNT_MYSTIC_MEDAL_PER_BUY
+                            )
+                            self.coins_spent += self.MYSTIC_MEDAL_PRICE
+                    else:
+                        self.should_continue = False
+                        print("You don't have any Coins left!")
+                else:
+                    self.should_continue = False
+                    print(f"Max amount of {self.coins_spent} Coins to spend reached!")
 
     def refresh_store(self):
         """
         This method handles the logic for refreshing the store.
         """
-        match_found, x, y = self.match_android_screen_to_image(
-            self.refresh_store_button
-        )
-        if not match_found:
-            print("I am unable to see the refresh button!")
-        else:
-            self.android_instance.click(x, y)
-            time.sleep(0.3)
-            match_found, x, y = self.match_android_screen_to_image(
-                self.refresh_store_confirmation
-            )
-            if not match_found:
-                print("I am unable to see the refresh confirmation pop up!")
-            else:
-                self.android_instance.click(x, y)
-                time.sleep(0.3)
+        self.update_current_skytones_and_coins()
+        if (
+            self.max_amount_skystones_to_spent == -1
+            or self.max_amount_skystones_to_spent
+            >= self.skystones_spent + self.SKYSTONES_PER_REFRESH
+        ):
+            if self.current_skystones >= self.SKYSTONES_PER_REFRESH:
                 match_found, x, y = self.match_android_screen_to_image(
-                    self.no_skystones_left
+                    self.refresh_store_button
                 )
-                if match_found:
-                    print("You're out of Skystones!")
-                    self.should_continue = False
+                if not match_found:
+                    print("I am unable to see the refresh button!")
+                else:
+                    self.android_instance.click(x, y)
+                    time.sleep(0.3)
+                    match_found, x, y = self.match_android_screen_to_image(
+                        self.refresh_store_confirmation
+                    )
+                    if not match_found:
+                        print("I am unable to see the refresh confirmation pop up!")
+                    else:
+                        self.android_instance.click(x, y)
+                        self.skystones_spent += self.SKYSTONES_PER_REFRESH
+                        self.refreshes_performed += 1
+            else:
+                self.should_continue = False
+                print("You don't have any Skystones left!")
+        else:
+            self.should_continue = False
+            print(f"Max amount of {self.skystones_spent} Skystones to spend reached!")
 
     def check_if_inside_secret_shop(self):
         """
@@ -283,6 +354,7 @@ class EpicSevenBot:
         """
         This method allows to handle preserving the ADB_port variable throughout different script runs.
         """
+        # self.android_port = self.get_adb_port()
         port_found = False
         if os.path.exists(self.android_port_txt_path):
             with open(self.android_port_txt_path, "r") as file:
@@ -327,15 +399,19 @@ class EpicSevenBot:
             default_input="y",
             default_value=True,
         )
-        self.amount_skystones_to_spent = self.get_user_input(
-            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
-            default_input="",
-            default_value="-1",
+        self.max_amount_skystones_to_spent = int(
+            self.get_user_input(
+                prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
+                default_input="",
+                default_value=-1,
+            )
         )
-        self.amount_coins_to_spent = self.get_user_input(
-            prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
-            default_input="",
-            default_value="-1",
+        self.max_amount_coins_to_spent = int(
+            self.get_user_input(
+                prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
+                default_input="",
+                default_value=-1,
+            )
         )
 
     def main(self):
@@ -346,8 +422,8 @@ class EpicSevenBot:
             self.load_image_resources()
             self.check_if_inside_secret_shop()
             time.sleep(3.0)
-            # self.secret_shop_bot()
-            self.check_skystones_and_coins()
+            self.update_current_skytones_and_coins(initial_setup=True)
+            self.secret_shop_bot()
 
 
 if __name__ == "__main__":

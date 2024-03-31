@@ -13,13 +13,13 @@ class EpicSevenBot:
     def __init__(self):
 
         # All the variables for images paths
+        self.readable_image_path_name = {}
         self.bookmark_image_path = ""
         self.bookmark_buy_confirmation = ""
         self.mystic_medal_image_path = ""
         self.mystic_medal_buy_confirmation = ""
         self.refresh_store_button = ""
         self.refresh_store_confirmation = ""
-        self.no_skystones_left = ""
         self.in_secret_shop = ""
 
         # All configuration values for the bot to work
@@ -30,8 +30,8 @@ class EpicSevenBot:
         self.android_port_txt_path = "android_ADB_port.txt"
         self.buy_bookmarks = True
         self.buy_mystic_medals = True
-        self.max_amount_skystones_to_spent = None
-        self.max_amount_coins_to_spent = None
+        self.max_amount_skystones_to_spend = None
+        self.max_amount_coins_to_spend = None
         self.current_coins = None
         self.current_skystones = None
         self.BOOKMARK_PRICE = 184_000
@@ -46,8 +46,6 @@ class EpicSevenBot:
         self.refreshes_performed = 0
         self.skystones_spent = 0
         self.coins_spent = 0
-        self.final_ratio_bookmarks = 0
-        self.final_ratio_mystic_medals = 0
         self.initial_amount_skystones = 0
         self.initial_amount_coins = 0
 
@@ -55,7 +53,54 @@ class EpicSevenBot:
         """
         This method prints all the shopping statistics.
         """
-        pass
+        self.update_current_skytones_and_coins()
+        final_amount_bookmarks = self.bookmarks_bought // self.AMOUNT_BOOKMARK_PER_BUY
+        final_amount_mystic_medals = (
+            self.mystic_medals_bought // self.AMOUNT_MYSTIC_MEDAL_PER_BUY
+        )
+
+        print("-----------------------------------------------------------")
+        print(f"Should Buy Bookmarks: {'✅' if self.buy_bookmarks else '❌'}")
+        print(f"Should Buy Mystic Medals: {'✅' if self.buy_mystic_medals else '❌'}")
+        print(
+            f"Max amount of Skystones to spend: {self.max_amount_skystones_to_spend if self.max_amount_skystones_to_spend > 0 else '♾️'}"
+        )
+        print(
+            f"Max amount of Coins to spend: {self.max_amount_coins_to_spend if self.max_amount_coins_to_spend > 0 else '♾️'}"
+        )
+        print(
+            f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)"
+        )
+        print(
+            f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)"
+        )
+        print(f"Refreshes Perfomed: {self.refreshes_performed}")
+        print(
+            f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}"
+        )
+        print(
+            f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}"
+        )
+
+        if self.refreshes_performed > 0:
+            bookmark_ratio = final_amount_bookmarks / self.refreshes_performed
+            bookmark_frequency = 1 / bookmark_ratio if bookmark_ratio > 0 else 0
+            mystic_medals_ratio = final_amount_mystic_medals / self.refreshes_performed
+            mystic_medals_frequency = (
+                1 / mystic_medals_ratio if mystic_medals_ratio > 0 else 0
+            )
+
+            if bookmark_frequency > 0:
+                print(
+                    f"You encountered 5 Bookmarks every { int(bookmark_frequency) } refreshes"
+                )
+
+            if mystic_medals_frequency > 0:
+                print(
+                    f"You encountered 50 Mystic Medals every { int(mystic_medals_frequency) } refreshes"
+                )
+
+        print("-----------------------------------------------------------")
 
     def load_image_resources(self):
         """
@@ -90,13 +135,19 @@ class EpicSevenBot:
                 current_dir, "shop_products", "refresh_store_confirmation.png"
             )
 
-            self.no_skystones_left = os.path.join(
-                current_dir, "shop_products", "no_skystones_left.png"
-            )
-
             self.in_secret_shop = os.path.join(
                 current_dir, "shop_products", "secret_shop.png"
             )
+
+            self.readable_image_path_name = {
+                self.bookmark_image_path: "Bookmark",
+                self.bookmark_buy_confirmation: "Bookmark Buy Confirmation",
+                self.mystic_medal_image_path: "Mystic Medal",
+                self.mystic_medal_buy_confirmation: "Mystic Medal Buy Confirmation",
+                self.refresh_store_button: "Refresh Button",
+                self.refresh_store_confirmation: "Refresh Store Confirmation",
+                self.in_secret_shop: "Secrect Shop",
+            }
 
             print("Image resources loaded successfully!")
         except Exception as e:
@@ -120,6 +171,7 @@ class EpicSevenBot:
 
             print("Connected to BlueStacks successfully!")
             return True
+
         except Exception as e:
             print(f"Failed to connect to BlueStacks: {e}")
             return False
@@ -149,14 +201,13 @@ class EpicSevenBot:
             # See if confidance range is 80% or higher
             if max_val > 0.8:
                 x, y = max_loc  # Get the coordinates of the matched image
-                h, w = image_to_search.shape[
-                    :-1
-                ]  # Get height and width of the matched image
+                # Get height and width of the matched image
+                h, w = image_to_search.shape[:-1]
                 # Calculate lower right corner coordinates, to be able to click the buy button
-                x2, y2 = x + w, y + h
+                x2, y2 = x + w - 20, y + h - 20
                 return True, x2, y2
             else:
-                print(f"Resource at {search_image_path} not found on screen.")
+                # print(f"{self.readable_image_path_name.get(search_image_path, 'Resource')} not found on screen.")
                 return False, 0, 0
         except Exception as e:
             print(f"There was an error: {e}")
@@ -167,7 +218,7 @@ class EpicSevenBot:
         This method handles the logic for buying bookmarks and mystic medals.
         """
         # We open the resource buying confirmation menu
-        self.android_instance.click(x, y)
+        self.android_instance.double_click(x, y)
 
         buy_confirmation = (
             self.bookmark_buy_confirmation
@@ -178,7 +229,8 @@ class EpicSevenBot:
         match_found, x, y = self.match_android_screen_to_image(buy_confirmation)
 
         if match_found:
-            self.android_instance.click(x, y)
+            time.sleep(0.5)
+            self.android_instance.double_click(x, y)
             return True
         else:
             print("I am unable to see the buy confirmation!")
@@ -202,8 +254,14 @@ class EpicSevenBot:
         cropped_image = screenshot_image.crop(region)
         cropped_image.save(screenshot_path)
         numbers = self.extract_numbers_from_image(screenshot_path)
-        self.current_coins = int(numbers[0][1].replace(",", ""))
-        self.current_skystones = int(numbers[1][1].replace(",", ""))
+        try:
+            self.current_coins = int(numbers[0][1].replace(",", "").strip())
+            self.current_skystones = int(numbers[1][1].replace(",", "").strip())
+        except ValueError:
+            time.sleep(2)
+            numbers = self.extract_numbers_from_image(screenshot_path)
+            self.current_coins = int(numbers[0][1].replace(",", "").strip())
+            self.current_skystones = int(numbers[1][1].replace(",", "").strip())
         if initial_setup:
             self.initial_amount_coins = self.current_coins
             self.initial_amount_skystones = self.current_skystones
@@ -218,8 +276,8 @@ class EpicSevenBot:
             if result:
                 self.update_current_skytones_and_coins()
                 if (
-                    self.max_amount_coins_to_spent == -1
-                    and self.max_amount_coins_to_spent
+                    self.max_amount_coins_to_spend == -1
+                    or self.max_amount_coins_to_spend
                     >= self.coins_spent + self.BOOKMARK_PRICE
                 ):
                     if self.current_coins >= self.BOOKMARK_PRICE:
@@ -241,8 +299,8 @@ class EpicSevenBot:
                 self.update_current_skytones_and_coins()
                 # If there is no limit to spend coins (-1) or we haven't reached the max amount of
                 if (
-                    self.max_amount_coins_to_spent == -1
-                    or self.max_amount_coins_to_spent
+                    self.max_amount_coins_to_spend == -1
+                    or self.max_amount_coins_to_spend
                     >= self.coins_spent + self.MYSTIC_MEDAL_PRICE
                 ):
                     if self.current_coins >= self.MYSTIC_MEDAL_PRICE:
@@ -264,8 +322,8 @@ class EpicSevenBot:
         """
         self.update_current_skytones_and_coins()
         if (
-            self.max_amount_skystones_to_spent == -1
-            or self.max_amount_skystones_to_spent
+            self.max_amount_skystones_to_spend == -1
+            or self.max_amount_skystones_to_spend
             >= self.skystones_spent + self.SKYSTONES_PER_REFRESH
         ):
             if self.current_skystones >= self.SKYSTONES_PER_REFRESH:
@@ -275,7 +333,7 @@ class EpicSevenBot:
                 if not match_found:
                     print("I am unable to see the refresh button!")
                 else:
-                    self.android_instance.click(x, y)
+                    self.android_instance.double_click(x, y)
                     time.sleep(0.3)
                     match_found, x, y = self.match_android_screen_to_image(
                         self.refresh_store_confirmation
@@ -283,7 +341,7 @@ class EpicSevenBot:
                     if not match_found:
                         print("I am unable to see the refresh confirmation pop up!")
                     else:
-                        self.android_instance.click(x, y)
+                        self.android_instance.double_click(x, y)
                         self.skystones_spent += self.SKYSTONES_PER_REFRESH
                         self.refreshes_performed += 1
             else:
@@ -309,11 +367,11 @@ class EpicSevenBot:
         This method contains the logic for matching, clicking, buying and refreshing the shop.
         """
         while self.should_continue:
+            time.sleep(1)
             self.get_resources()
             self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
             self.get_resources()
             self.refresh_store()
-        self.show_shopping_report()
         print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
 
     def get_user_input(
@@ -399,14 +457,14 @@ class EpicSevenBot:
             default_input="y",
             default_value=True,
         )
-        self.max_amount_skystones_to_spent = int(
+        self.max_amount_skystones_to_spend = int(
             self.get_user_input(
                 prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
                 default_input="",
                 default_value=-1,
             )
         )
-        self.max_amount_coins_to_spent = int(
+        self.max_amount_coins_to_spend = int(
             self.get_user_input(
                 prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
                 default_input="",
@@ -416,14 +474,19 @@ class EpicSevenBot:
 
     def main(self):
         print("Welcome to the Epic 7 Secret Shop Refresher Bot!")
+        print("NOTE: At any time you can press Ctrl+C to stop the Bot execution")
         self.get_initial_user_configuration_info()
         self.should_continue = self.connect_to_android()
         if self.should_continue:
-            self.load_image_resources()
-            self.check_if_inside_secret_shop()
-            time.sleep(3.0)
-            self.update_current_skytones_and_coins(initial_setup=True)
-            self.secret_shop_bot()
+            try:
+                self.load_image_resources()
+                self.check_if_inside_secret_shop()
+                self.update_current_skytones_and_coins(initial_setup=True)
+                self.secret_shop_bot()
+            except KeyboardInterrupt:
+                print("\nCtrl+C pressed. Exiting gracefully...")
+            finally:
+                self.show_shopping_report()
 
 
 if __name__ == "__main__":

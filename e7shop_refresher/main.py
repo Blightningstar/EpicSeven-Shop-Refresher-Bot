@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 
@@ -19,6 +20,7 @@ class EpicSevenBot:
         self.refresh_store_button = ""
         self.refresh_store_confirmation = ""
         self.in_secret_shop = ""
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
 
         # All configuration values for the bot to work
         self.should_continue = True
@@ -30,6 +32,7 @@ class EpicSevenBot:
         self.buy_mystic_medals = True
         self.max_amount_skystones_to_spend = None
         self.max_amount_coins_to_spend = None
+        self.save_report = True
         self.current_coins = None
         self.current_skystones = None
         self.BOOKMARK_PRICE = 184_000
@@ -47,6 +50,14 @@ class EpicSevenBot:
         self.initial_amount_skystones = 0
         self.initial_amount_coins = 0
 
+    def write_to_file_and_console(self, content, filename):
+        # Write content to console
+        print(content)
+        if self.save_report:
+            # Write content to file
+            with open(filename, "a", encoding="utf-8") as f:
+                f.write(content + "\n")
+
     def show_shopping_report(self):
         """
         This method prints all the shopping statistics.
@@ -57,34 +68,57 @@ class EpicSevenBot:
             self.mystic_medals_bought // self.AMOUNT_MYSTIC_MEDAL_PER_BUY
         )
 
-        print("-----------------------------------------------------------")
-        print(f"Should Buy Bookmarks: {'✅' if self.buy_bookmarks else '❌'}")
-        print(f"Should Buy Mystic Medals: {'✅' if self.buy_mystic_medals else '❌'}")
-        print(
-            f"Max amount of Skystones to spend: {self.max_amount_skystones_to_spend if self.max_amount_skystones_to_spend > 0 else '♾️'}"
+        # Create filename with timestamp
+        folder_path = "reports"
+        os.makedirs(folder_path, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        filename = f"{folder_path}/shopping_report_{timestamp}.txt"
+
+        self.write_to_file_and_console(
+            "-----------------------------------------------------------", filename
         )
-        print(
-            f"Max amount of Coins to spend: {self.max_amount_coins_to_spend if self.max_amount_coins_to_spend > 0 else '♾️'}"
+        self.write_to_file_and_console(
+            f"Should Buy Bookmarks: {'✅' if self.buy_bookmarks else '❌'}", filename
         )
-        print(
-            f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)"
+        self.write_to_file_and_console(
+            f"Should Buy Mystic Medals: {'✅' if self.buy_mystic_medals else '❌'}",
+            filename,
         )
-        print(
-            f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)"
+        self.write_to_file_and_console(
+            f"Max amount of Skystones to spend: {self.max_amount_skystones_to_spend if self.max_amount_skystones_to_spend > 0 else '♾️'}",
+            filename,
         )
-        print(f"Refreshes Perfomed: {self.refreshes_performed}")
+        self.write_to_file_and_console(
+            f"Max amount of Coins to spend: {self.max_amount_coins_to_spend if self.max_amount_coins_to_spend > 0 else '♾️'}",
+            filename,
+        )
+        self.write_to_file_and_console(
+            f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)",
+            filename,
+        )
+        self.write_to_file_and_console(
+            f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)",
+            filename,
+        )
+        self.write_to_file_and_console(
+            f"Refreshes Perfomed: {self.refreshes_performed}", filename
+        )
         if self.initial_amount_skystones != 0:
-            print(
-                f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}"
+            self.write_to_file_and_console(
+                f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}",
+                filename,
             )
         else:
-            print(f"Skystones: {self.current_skystones}")
+            self.write_to_file_and_console(
+                f"Skystones: {self.current_skystones}", filename
+            )
         if self.initial_amount_coins != 0:
-            print(
-                f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}"
+            self.write_to_file_and_console(
+                f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}",
+                filename,
             )
         else:
-            print(f"Coins: {self.current_coins}")
+            self.write_to_file_and_console(f"Coins: {self.current_coins}", filename)
 
         if self.refreshes_performed > 0:
             bookmark_ratio = final_amount_bookmarks / self.refreshes_performed
@@ -95,16 +129,20 @@ class EpicSevenBot:
             )
 
             if bookmark_frequency > 0:
-                print(
-                    f"You encountered 5 Bookmarks every { int(bookmark_frequency) } refreshes"
+                self.write_to_file_and_console(
+                    f"You encountered 5 Bookmarks every { int(bookmark_frequency) } refreshes",
+                    filename,
                 )
 
             if mystic_medals_frequency > 0:
-                print(
-                    f"You encountered 50 Mystic Medals every { int(mystic_medals_frequency) } refreshes"
+                self.write_to_file_and_console(
+                    f"You encountered 50 Mystic Medals every { int(mystic_medals_frequency) } refreshes",
+                    filename,
                 )
 
-        print("-----------------------------------------------------------")
+        self.write_to_file_and_console(
+            "-----------------------------------------------------------", filename
+        )
 
     def load_image_resources(self):
         """
@@ -113,34 +151,33 @@ class EpicSevenBot:
         """
         try:
             print("Loading the image resources ...", end="\r")
-            current_dir = os.path.dirname(os.path.abspath(__file__))
 
             self.bookmark_image_path = os.path.join(
-                current_dir, "image_resources", "bookmark_shop_entry.png"
+                self.current_dir, "image_resources", "bookmark_shop_entry.png"
             )
 
             self.bookmark_buy_confirmation = os.path.join(
-                current_dir, "image_resources", "bookmark_buy_confirmation.png"
+                self.current_dir, "image_resources", "bookmark_buy_confirmation.png"
             )
 
             self.mystic_medal_image_path = os.path.join(
-                current_dir, "image_resources", "mystic_medal_shop_entry.png"
+                self.current_dir, "image_resources", "mystic_medal_shop_entry.png"
             )
 
             self.mystic_medal_buy_confirmation = os.path.join(
-                current_dir, "image_resources", "mystic_medal_buy_confirmation.png"
+                self.current_dir, "image_resources", "mystic_medal_buy_confirmation.png"
             )
 
             self.refresh_store_button = os.path.join(
-                current_dir, "image_resources", "refresh_button.png"
+                self.current_dir, "image_resources", "refresh_button.png"
             )
 
             self.refresh_store_confirmation = os.path.join(
-                current_dir, "image_resources", "refresh_store_confirmation.png"
+                self.current_dir, "image_resources", "refresh_store_confirmation.png"
             )
 
             self.in_secret_shop = os.path.join(
-                current_dir, "image_resources", "secret_shop.png"
+                self.current_dir, "image_resources", "secret_shop.png"
             )
 
             self.readable_image_path_name = {
@@ -250,9 +287,8 @@ class EpicSevenBot:
         """
         This method checks if spending limit has been reached for Skystones or Coins.
         """
-        current_dir = os.path.dirname(os.path.abspath(__file__))
         screenshot_path = os.path.join(
-            current_dir, "image_resources", "resources_screenshot.png"
+            self.current_dir, "image_resources", "resources_screenshot.png"
         )
         screenshot = self.android_instance.screenshot(format="opencv")
         screenshot_image = Image.fromarray(screenshot)
@@ -268,13 +304,17 @@ class EpicSevenBot:
         cropped_image.save(screenshot_path)
         numbers = self.extract_numbers_from_image(screenshot_path)
         try:
-            self.current_coins = int(numbers[0][1].replace(",", "").strip())
-            self.current_skystones = int(numbers[1][1].replace(",", "").strip())
+            self.current_coins = int(numbers[0][1].replace(",", "").replace(" ", ""))
+            self.current_skystones = int(
+                numbers[1][1].replace(",", "").replace(" ", "")
+            )
         except ValueError:
             time.sleep(2)
             numbers = self.extract_numbers_from_image(screenshot_path)
-            self.current_coins = int(numbers[0][1].replace(",", "").strip())
-            self.current_skystones = int(numbers[1][1].replace(",", "").strip())
+            self.current_coins = int(numbers[0][1].replace(",", "").replace(" ", ""))
+            self.current_skystones = int(
+                numbers[1][1].replace(",", "").replace(" ", "")
+            )
         if initial_setup:
             self.initial_amount_coins = self.current_coins
             self.initial_amount_skystones = self.current_skystones
@@ -492,6 +532,13 @@ class EpicSevenBot:
                 default_input="",
                 default_value=-1,
             )
+        )
+        self.save_report = self.get_user_input(
+            prompt="Do you want to save the shop report upon exit? (y/n) [y]:  ",
+            prompt_options=["y", "n"],
+            prompt_option_values=[True, False],
+            default_input="y",
+            default_value=True,
         )
 
     def main(self):

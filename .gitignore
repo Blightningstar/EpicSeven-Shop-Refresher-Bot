@@ -160,4 +160,5 @@ cython_debug/
 #.idea/
 .vscode/
 android_ADB_port.txt
-e7shop_refresher/screenshots/screenshot.png
+reports/
+e7shop_refresher/image_resources/resources_screenshot.png

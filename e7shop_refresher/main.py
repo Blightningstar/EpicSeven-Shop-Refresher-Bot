@@ -3,9 +3,7 @@ import time
 
 import cv2
 import easyocr
-import numpy as np
 import uiautomator2 as u2
-from icecream import ic
 from PIL import Image
 
 
@@ -75,12 +73,18 @@ class EpicSevenBot:
             f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)"
         )
         print(f"Refreshes Perfomed: {self.refreshes_performed}")
-        print(
-            f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}"
-        )
-        print(
-            f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}"
-        )
+        if self.initial_amount_skystones != 0:
+            print(
+                f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}"
+            )
+        else:
+            print(f"Skystones: {self.current_skystones}")
+        if self.initial_amount_coins != 0:
+            print(
+                f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}"
+            )
+        else:
+            print(f"Coins: {self.current_coins}")
 
         if self.refreshes_performed > 0:
             bookmark_ratio = final_amount_bookmarks / self.refreshes_performed
@@ -112,31 +116,31 @@ class EpicSevenBot:
             current_dir = os.path.dirname(os.path.abspath(__file__))
 
             self.bookmark_image_path = os.path.join(
-                current_dir, "shop_products", "bookmark_shop_entry.png"
+                current_dir, "image_resources", "bookmark_shop_entry.png"
             )
 
             self.bookmark_buy_confirmation = os.path.join(
-                current_dir, "shop_products", "bookmark_buy_confirmation.png"
+                current_dir, "image_resources", "bookmark_buy_confirmation.png"
             )
 
             self.mystic_medal_image_path = os.path.join(
-                current_dir, "shop_products", "mystic_medal_shop_entry.png"
+                current_dir, "image_resources", "mystic_medal_shop_entry.png"
             )
 
             self.mystic_medal_buy_confirmation = os.path.join(
-                current_dir, "shop_products", "mystic_medal_buy_confirmation.png"
+                current_dir, "image_resources", "mystic_medal_buy_confirmation.png"
             )
 
             self.refresh_store_button = os.path.join(
-                current_dir, "shop_products", "refresh_button.png"
+                current_dir, "image_resources", "refresh_button.png"
             )
 
             self.refresh_store_confirmation = os.path.join(
-                current_dir, "shop_products", "refresh_store_confirmation.png"
+                current_dir, "image_resources", "refresh_store_confirmation.png"
             )
 
             self.in_secret_shop = os.path.join(
-                current_dir, "shop_products", "secret_shop.png"
+                current_dir, "image_resources", "secret_shop.png"
             )
 
             self.readable_image_path_name = {
@@ -173,8 +177,14 @@ class EpicSevenBot:
             return True
 
         except Exception as e:
-            print(f"Failed to connect to BlueStacks: {e}")
-            return False
+            if "Invalid version: ''" in e.args:
+                _ = input(
+                    "Please go to your ATX App and click the 启动UIAUTOMATOR button. Press Enter when done: "
+                )
+                return self.connect_to_android()
+            else:
+                print(f"Failed to connect to BlueStacks: {e}")
+                return False
 
     def extract_numbers_from_image(self, resource_image):
         """
@@ -225,7 +235,7 @@ class EpicSevenBot:
             if resource == "bookmark"
             else self.mystic_medal_buy_confirmation
         )
-
+        time.sleep(0.5)
         match_found, x, y = self.match_android_screen_to_image(buy_confirmation)
 
         if match_found:
@@ -240,7 +250,10 @@ class EpicSevenBot:
         """
         This method checks if spending limit has been reached for Skystones or Coins.
         """
-        screenshot_path = "e7shop_refresher\\screenshots\\screenshot.png"
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        screenshot_path = os.path.join(
+            current_dir, "image_resources", "resources_screenshot.png"
+        )
         screenshot = self.android_instance.screenshot(format="opencv")
         screenshot_image = Image.fromarray(screenshot)
         # Here is region in which the account's Coins and Skystones are located
@@ -357,8 +370,11 @@ class EpicSevenBot:
         """
         match_found, _, _ = self.match_android_screen_to_image(self.in_secret_shop)
         if not match_found:
-            print("This bot only works inside the tabern's secret shop!")
-            self.should_continue = False
+            print("This bot only works inside Garo's Tabern Secret Shop!")
+            _ = input(
+                "Please move to Garo's Tabern Secret Shop and press Enter when done: "
+            )
+            self.check_if_inside_secret_shop()
         else:
             print("Hi Garo, I'll be ordering the usual!")
 
@@ -368,8 +384,12 @@ class EpicSevenBot:
         """
         while self.should_continue:
             time.sleep(1)
+            # To get rid of Heroe Dispatches Returning
+            self.android_instance.double_click(1120, 730)
             self.get_resources()
-            self.android_instance.swipe(1230, 820, 1229, 480, 0.1)
+            self.android_instance.swipe(1150, 720, 1130, 430, 0.1)
+            # To get rid of Heroe Dispatches Returning
+            self.android_instance.double_click(1120, 730)
             self.get_resources()
             self.refresh_store()
         print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
@@ -475,6 +495,9 @@ class EpicSevenBot:
     def main(self):
         print("Welcome to the Epic 7 Secret Shop Refresher Bot!")
         print("NOTE: At any time you can press Ctrl+C to stop the Bot execution")
+        print(
+            "NOTE: Please cancel any pending Dispatch Mission in your High Command to avoid weird behaviors"
+        )
         self.get_initial_user_configuration_info()
         self.should_continue = self.connect_to_android()
         if self.should_continue:

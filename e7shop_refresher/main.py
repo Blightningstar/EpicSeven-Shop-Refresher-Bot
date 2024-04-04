@@ -243,7 +243,7 @@ class EpicSevenBot:
             self.android_instance.double_click(x, y)
             return True
         else:
-            print("I am unable to see the buy confirmation!")
+            # print("I am unable to see the buy confirmation!")
             return False
 
     def update_current_skytones_and_coins(self, initial_setup=False):
@@ -344,7 +344,8 @@ class EpicSevenBot:
                     self.refresh_store_button
                 )
                 if not match_found:
-                    print("I am unable to see the refresh button!")
+                    # print("I am unable to see the refresh button!")
+                    pass
                 else:
                     self.android_instance.double_click(x, y)
                     time.sleep(0.3)
@@ -352,7 +353,8 @@ class EpicSevenBot:
                         self.refresh_store_confirmation
                     )
                     if not match_found:
-                        print("I am unable to see the refresh confirmation pop up!")
+                        # print("I am unable to see the refresh confirmation pop up!")
+                        pass
                     else:
                         self.android_instance.double_click(x, y)
                         self.skystones_spent += self.SKYSTONES_PER_REFRESH

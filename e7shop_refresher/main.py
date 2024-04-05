@@ -4,6 +4,7 @@ import time
 
 import cv2
 import easyocr
+import psutil
 import uiautomator2 as u2
 from PIL import Image
 
@@ -26,7 +27,7 @@ class EpicSevenBot:
         self.should_continue = True
         self.android_instance = None
         self.ocr_instance = easyocr.Reader(["en"], gpu=False)
-        self.android_port = 8000
+        self.android_port = None
         self.android_port_txt_path = "android_ADB_port.txt"
         self.buy_bookmarks = True
         self.buy_mystic_medals = True
@@ -55,8 +56,8 @@ class EpicSevenBot:
         print(content)
         if self.save_report:
             # Write content to file
-            with open(filename, "a", encoding="utf-8") as f:
-                f.write(content + "\n")
+            with open(filename, "a", encoding="utf-8") as file:
+                file.write(content + "\n")
 
     def show_shopping_report(self):
         """
@@ -470,34 +471,96 @@ class EpicSevenBot:
                 incorrect_input = False
                 return user_input
 
+    def get_all_system_drives(self):
+        """
+        This method gets all drives names of the system
+        """
+        drive_info = []
+        partitions = psutil.disk_partitions(all=True)
+        for partition in partitions:
+            drive_info.append(partition.device)
+        return drive_info
+
+    def find_bluestacks_conf(self, available_system_drives):
+        print("Finding Bluestack Configuration ...")
+        probable_paths = [
+            "{}Program Files\\BlueStacks_nxt",
+            "{}Program Files (x86)\\BlueStacks_nxt",
+            "{}ProgramData\\BlueStacks_nxt",
+            "{}bluestacks\\BlueStacks_nxt",
+        ]
+
+        for drive in available_system_drives:
+            for path_template in probable_paths:
+                path = path_template.format(drive)
+                print(f"Searching on {path}...", end="\r")
+                if os.path.exists(path):
+                    conf_path = os.path.join(path, "bluestacks.conf")
+                    if os.path.exists(conf_path):
+                        return conf_path
+
+        if (
+            self.get_user_input(
+                prompt="It seems your local installation of Bluestacks is not on a common place, do you want to search your whole system for it? This may take a while (y/n) [n]:  ",
+                prompt_options=["y", "n"],
+                prompt_option_values=[True, False],
+                default_input="n",
+                default_value=False,
+            )
+            is True
+        ):
+            for drive in available_system_drives:
+                for root, drive, files in os.walk(drive):
+                    if "bluestacks.conf" in files:
+                        return os.path.join(root, "bluestacks.conf")
+        return None
+
+    def get_adb_port(self):
+        """
+        This method searches the bluestacks.conf for the current port in which ADB is running
+        """
+        drive_names = self.get_all_system_drives()
+        bluestacks_conf_path = self.find_bluestacks_conf(drive_names)
+        if bluestacks_conf_path:
+            print(f"Found Bluestacks configuration file at {bluestacks_conf_path}")
+            with open(bluestacks_conf_path, "r") as file:
+                for line in file:
+                    if "bst.instance.Pie64.status.adb_port" in line:
+                        self.android_port = int(line.split("=")[1].replace('"', ""))
+                        print(f"Your ADB port is: {self.android_port}")
+                        break
+        else:
+            print("Bluestacks configuration file not found.")
+
     def check_stored_android_port(self):
         """
         This method allows to handle preserving the ADB_port variable throughout different script runs.
         """
-        # self.android_port = self.get_adb_port()
-        port_found = False
-        if os.path.exists(self.android_port_txt_path):
-            with open(self.android_port_txt_path, "r") as file:
-                first_line = file.readline().strip()
-                if first_line.startswith("ADB_port="):
-                    self.android_port = first_line.split("=")[1]
-                    port_found = True
-                    print("Stored ADB Port found: ", self.android_port)
-        if not os.path.exists(self.android_port_txt_path) or not port_found:
-            with open(self.android_port_txt_path, "w") as file:
-                should_store_ADB_port = self.get_user_input(
-                    prompt="I see you do not have your ADB port stored yet. You want to store it? (y/n) [y]:  ",
-                    prompt_options=["y", "n"],
-                    prompt_option_values=[True, False],
-                    default_input="y",
-                    default_value=True,
-                )
-                self.android_port = self.get_user_input(
-                    prompt="In which port is your Android instance ADB running?:  ",
-                )
-                if should_store_ADB_port:
-                    file.write(f"ADB_port={self.android_port}\n")
-                    print("ADB Port Stored!")
+        self.get_adb_port()
+        if not self.android_port:
+            port_found = False
+            if os.path.exists(self.android_port_txt_path):
+                with open(self.android_port_txt_path, "r") as file:
+                    first_line = file.readline().strip()
+                    if first_line.startswith("ADB_port="):
+                        self.android_port = first_line.split("=")[1]
+                        port_found = True
+                        print("Stored ADB Port found: ", self.android_port)
+            if not os.path.exists(self.android_port_txt_path) or not port_found:
+                with open(self.android_port_txt_path, "w") as file:
+                    should_store_ADB_port = self.get_user_input(
+                        prompt="I see you do not have your ADB port stored yet. You want to store it? (y/n) [y]:  ",
+                        prompt_options=["y", "n"],
+                        prompt_option_values=[True, False],
+                        default_input="y",
+                        default_value=True,
+                    )
+                    self.android_port = self.get_user_input(
+                        prompt="In which port is your Android instance ADB running?:  ",
+                    )
+                    if should_store_ADB_port:
+                        file.write(f"ADB_port={self.android_port}\n")
+                        print("ADB Port Stored!")
 
     def get_initial_user_configuration_info(self):
         """

@@ -11,6 +11,8 @@ opencv-python = "^4.9.0.80"
 uiautomator2 = "^3.0.4"
 easyocr = "^1.7.1"
 psutil = "^5.9.8"
+windows-curses = "^2.3.2"
+urwid = "^2.6.10"
 
 [tool.poetry.group.dev.dependencies]
 icecream = "^2.1.3"

@@ -11,6 +11,8 @@ from PIL import Image
 
 class EpicSevenBot:
     def __init__(self):
+        # Bluestacks 5 Path
+        self.BLUESTACKS_CONF_ADB_PORT_FIELD = "bst.instance.Pie64.status.adb_port"
 
         # All the variables for images paths
         self.readable_image_path_name = {}
@@ -196,6 +198,24 @@ class EpicSevenBot:
             print(f"There was an error loading the resources: {e}")
             self.should_continue = False
 
+    def display_secret_shop_progress(self):
+        progress = ""
+        if self.max_amount_skystones_to_spend != -1:
+            progress += f"Amount of Skystones spent: {self.skystones_spent} out of {self.max_amount_skystones_to_spend}\r"
+        if self.max_amount_coins_to_spend != -1:
+            progress += f"Amount of Coins spent: {self.coins_spent} out of {self.max_amount_coins_to_spend}\r"
+        if self.buy_bookmarks:
+            final_amount_bookmarks = (
+                self.bookmarks_bought // self.AMOUNT_BOOKMARK_PER_BUY
+            )
+            progress += f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)\r"
+        if self.buy_mystic_medals:
+            final_amount_mystic_medals = (
+                self.mystic_medals_bought // self.AMOUNT_MYSTIC_MEDAL_PER_BUY
+            )
+            progress += f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)\r"
+        print(progress, end="")
+
     def connect_to_android(self):
         """
         This method handles the connection of the script to android instance.
@@ -338,6 +358,7 @@ class EpicSevenBot:
                         if self.buy_resource(x, y):
                             self.bookmarks_bought += self.AMOUNT_BOOKMARK_PER_BUY
                             self.coins_spent += self.BOOKMARK_PRICE
+                            self.display_secret_shop_progress()
                     else:
                         self.should_continue = False
                         print("You don't have any Coins left!")
@@ -363,6 +384,7 @@ class EpicSevenBot:
                                 self.AMOUNT_MYSTIC_MEDAL_PER_BUY
                             )
                             self.coins_spent += self.MYSTIC_MEDAL_PRICE
+                            self.display_secret_shop_progress()
                     else:
                         self.should_continue = False
                         print("You don't have any Coins left!")
@@ -425,6 +447,7 @@ class EpicSevenBot:
         """
         This method contains the logic for matching, clicking, buying and refreshing the shop.
         """
+        self.display_secret_shop_progress()
         while self.should_continue:
             time.sleep(1)
             # To get rid of Heroe Dispatches Returning
@@ -444,6 +467,7 @@ class EpicSevenBot:
         prompt_option_values=None,
         default_input=None,
         default_value=None,
+        require_positive_integer=False,
     ):
         """
         This method handles user inputs for an amazing and smooth UX.
@@ -459,6 +483,15 @@ class EpicSevenBot:
             ):
                 incorrect_input = False
                 return default_value
+
+            if require_positive_integer:
+                # Check if the input is a positive integer
+                try:
+                    user_input_int = int(user_input)
+                    if user_input_int > 0:
+                        return user_input_int
+                except ValueError:
+                    pass
             if prompt_options:
                 # User inputted one of the prompt_options
                 if user_input in prompt_options:
@@ -467,7 +500,7 @@ class EpicSevenBot:
                         return prompt_option_values[prompt_options.index(user_input)]
                     else:
                         return user_input
-            else:
+            elif not require_positive_integer:
                 incorrect_input = False
                 return user_input
 
@@ -525,7 +558,7 @@ class EpicSevenBot:
             print(f"Found Bluestacks configuration file at {bluestacks_conf_path}")
             with open(bluestacks_conf_path, "r") as file:
                 for line in file:
-                    if "bst.instance.Pie64.status.adb_port" in line:
+                    if self.BLUESTACKS_CONF_ADB_PORT_FIELD in line:
                         self.android_port = int(line.split("=")[1].replace('"', ""))
                         print(f"Your ADB port is: {self.android_port}")
                         break
@@ -557,6 +590,7 @@ class EpicSevenBot:
                     )
                     self.android_port = self.get_user_input(
                         prompt="In which port is your Android instance ADB running?:  ",
+                        require_positive_integer=True,
                     )
                     if should_store_ADB_port:
                         file.write(f"ADB_port={self.android_port}\n")
@@ -582,19 +616,17 @@ class EpicSevenBot:
             default_input="y",
             default_value=True,
         )
-        self.max_amount_skystones_to_spend = int(
-            self.get_user_input(
-                prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
-                default_input="",
-                default_value=-1,
-            )
+        self.max_amount_skystones_to_spend = self.get_user_input(
+            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
+            default_input="",
+            default_value=-1,
+            require_positive_integer=True,
         )
-        self.max_amount_coins_to_spend = int(
-            self.get_user_input(
-                prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
-                default_input="",
-                default_value=-1,
-            )
+        self.max_amount_coins_to_spend = self.get_user_input(
+            prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
+            default_input="",
+            default_value=-1,
+            require_positive_integer=True,
         )
         self.save_report = self.get_user_input(
             prompt="Do you want to save the shop report upon exit? (y/n) [y]:  ",

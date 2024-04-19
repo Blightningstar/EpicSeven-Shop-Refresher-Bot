@@ -1,23 +1,24 @@
-import curses
 import datetime
 import os
+import shutil
+import sys
 import time
-from curses import wrapper
 
 import cv2
 import easyocr
 import psutil
 import uiautomator2 as u2
+from colorama import Fore, Style, init
 from PIL import Image
 
 
 class EpicSevenBot:
     def __init__(self):
-        # Curses Terminal
-        self.stdscr = None
-
         # Bluestacks 5 Path
         self.BLUESTACKS_CONF_ADB_PORT_FIELD = "bst.instance.Pie64.status.adb_port"
+
+        # Initialize Colorama
+        init()
 
         # All the variables for images paths
         self.readable_image_path_name = {}
@@ -50,6 +51,7 @@ class EpicSevenBot:
         self.SKYSTONES_PER_REFRESH = 3
 
         # All the report variables
+        self.variables_to_show_progress = []
         self.bookmarks_bought = 0
         self.mystic_medals_bought = 0
         self.refreshes_performed = 0
@@ -58,37 +60,17 @@ class EpicSevenBot:
         self.initial_amount_skystones = 0
         self.initial_amount_coins = 0
 
-    def prepare_curses_screen(self, stdscr):
-        """
-        Initialize all the Curses variables to print on screen
-        """
-        self.stdscr = stdscr
-        self.stdscr.clear()
-        # Colors Used
-        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
-        self.RED_ON_BLACK = curses.color_pair(1)
+    def move_cursor_to_last_line(self):
+        # Get the size of the terminal window
+        rows, _ = shutil.get_terminal_size()
+        # Move the cursor to the last line
+        sys.stdout.write(f"\033[{rows};0H")
 
-    def crs_print(
-        self,
-        message,
-        message_styling=None,
-        new_line=True,
-        window=None,
-        should_clear=False,
-    ):
-        """
-        Print on Curse Window
-        """
-        if not window:
-            window = self.stdscr
-        if should_clear:
-            window.clear()
-        if new_line:
-            message += "\n"
-        window.addstr(message) if not message_styling else window.addstr(
-            message, message_styling
-        )
-        window.refresh()
+    def overwrite_last_lines(self, lines_to_overwrite):
+        sys.stdout.write("\033[F" * lines_to_overwrite)  # Move cursor up
+
+    def update_print(self, message):
+        print("\033[K" + message, end="\r")
 
     def write_to_file_and_console(self, content, filename):
         # Write content to console
@@ -97,6 +79,15 @@ class EpicSevenBot:
             # Write content to file
             with open(filename, "a", encoding="utf-8") as file:
                 file.write(content + "\n")
+
+    def format_number(self, number):
+        num_str = str(number)
+        result = ""
+        for i in range(len(num_str) - 1, -1, -1):
+            result = num_str[i] + result
+            if (len(num_str) - i) % 3 == 0 and i != 0:
+                result = "," + result
+        return result
 
     def show_shopping_report(self):
         """
@@ -125,41 +116,39 @@ class EpicSevenBot:
             filename,
         )
         self.write_to_file_and_console(
-            f"Max amount of Skystones to spend: {self.max_amount_skystones_to_spend if self.max_amount_skystones_to_spend > 0 else '♾️'}",
+            f"Max amount of Skystones to spend: {self.format_number(self.max_amount_skystones_to_spend) if self.max_amount_skystones_to_spend > 0 else '♾️'}",
             filename,
         )
         self.write_to_file_and_console(
-            f"Max amount of Coins to spend: {self.max_amount_coins_to_spend if self.max_amount_coins_to_spend > 0 else '♾️'}",
+            f"Max amount of Coins to spend: {self.format_number(self.max_amount_coins_to_spend) if self.max_amount_coins_to_spend > 0 else '♾️'}",
             filename,
         )
         self.write_to_file_and_console(
-            f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)",
+            f"Bookmarks Bought: {final_amount_bookmarks} ({self.format_number(self.bookmarks_bought)} Bookmarks)",
             filename,
         )
         self.write_to_file_and_console(
-            f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)",
+            f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.format_number(self.mystic_medals_bought)} Mystic Medals)",
             filename,
         )
         self.write_to_file_and_console(
-            f"Refreshes Perfomed: {self.refreshes_performed}", filename
+            f"Refreshes Perfomed: {self.format_number(self.refreshes_performed)}",
+            filename,
         )
-        if self.initial_amount_skystones != 0:
-            self.write_to_file_and_console(
-                f"Skystones: {self.initial_amount_skystones} - {self.initial_amount_skystones - self.current_skystones} = {self.current_skystones}",
-                filename,
-            )
-        else:
-            self.write_to_file_and_console(
-                f"Skystones: {self.current_skystones}", filename
-            )
-        if self.initial_amount_coins != 0:
-            self.write_to_file_and_console(
-                f"Coins: {self.initial_amount_coins} - {self.initial_amount_coins - self.current_coins} = {self.current_coins}",
-                filename,
-            )
-        else:
-            self.write_to_file_and_console(f"Coins: {self.current_coins}", filename)
-
+        self.write_to_file_and_console(
+            f"Initial Skystones: {self.format_number(self.initial_amount_skystones)}",
+            filename,
+        )
+        self.write_to_file_and_console(
+            f"Skystones Spent: {self.format_number(self.skystones_spent)}",
+            filename,
+        )
+        self.write_to_file_and_console(
+            f"Initial Coins: {self.format_number(self.initial_amount_coins)}", filename
+        )
+        self.write_to_file_and_console(
+            f"Coins Spent: {self.format_number(self.coins_spent)}", filename
+        )
         if self.refreshes_performed > 0:
             bookmark_ratio = final_amount_bookmarks / self.refreshes_performed
             bookmark_frequency = 1 / bookmark_ratio if bookmark_ratio > 0 else 0
@@ -184,23 +173,56 @@ class EpicSevenBot:
             "-----------------------------------------------------------", filename
         )
 
-    def display_secret_shop_progress(self):
+    def display_progress_bar(self, max_value, current_value, increment_by=1):
+        percentage = (
+            int((current_value / max_value) * 100)
+            if max_value > current_value + increment_by
+            else 100
+        )
+        bar = f"[{'=' * percentage}{'>' if percentage < 100 else '='}{' ' * (100 - percentage)}] {percentage}%\n"
+        if percentage < 20:
+            return Fore.LIGHTRED_EX + bar + Fore.WHITE
+        elif percentage < 40:
+            return Fore.LIGHTMAGENTA_EX + bar + Fore.WHITE
+        elif percentage < 60:
+            return Fore.LIGHTBLUE_EX + bar + Fore.WHITE
+        elif percentage < 80:
+            return Fore.LIGHTCYAN_EX + bar + Fore.WHITE
+        elif percentage >= 80 and percentage < 100:
+            return Fore.LIGHTYELLOW_EX + bar + Fore.WHITE
+        elif percentage == 100:
+            return Fore.LIGHTGREEN_EX + bar + Fore.WHITE
+
+    def display_secret_shop_progress(self, first_display=False):
+        if not first_display:
+            progress_bar_line = 0
+            if self.max_amount_skystones_to_spend != -1:
+                progress_bar_line += 1
+            if self.max_amount_coins_to_spend != -1:
+                progress_bar_line += 1
+            self.overwrite_last_lines(
+                len(self.variables_to_show_progress) + progress_bar_line
+            )
+
         progress = ""
         if self.max_amount_skystones_to_spend != -1:
-            progress += f"Amount of Skystones spent: {self.skystones_spent} out of {self.max_amount_skystones_to_spend}\r"
+            progress += f"Amount of Skystones spent: {self.format_number(self.skystones_spent)} out of {self.format_number(self.max_amount_skystones_to_spend)}\n"
+            progress += f"{self.display_progress_bar(max_value=self.max_amount_skystones_to_spend, current_value=self.skystones_spent)}"
         if self.max_amount_coins_to_spend != -1:
-            progress += f"Amount of Coins spent: {self.coins_spent} out of {self.max_amount_coins_to_spend}\r"
+            progress += f"Amount of Coins spent: {self.format_number(self.coins_spent)} out of {self.format_number(self.max_amount_coins_to_spend)}\n"
+            progress += f"{self.display_progress_bar(max_value=self.max_amount_coins_to_spend, current_value=self.coins_spent)}"
         if self.buy_bookmarks:
             final_amount_bookmarks = (
                 self.bookmarks_bought // self.AMOUNT_BOOKMARK_PER_BUY
             )
-            progress += f"Bookmarks Bought: {final_amount_bookmarks} ({self.bookmarks_bought} Bookmarks)\r"
+            progress += f"Bookmarks Bought: {final_amount_bookmarks} ({self.format_number(self.bookmarks_bought)} Bookmarks)\n"
         if self.buy_mystic_medals:
             final_amount_mystic_medals = (
                 self.mystic_medals_bought // self.AMOUNT_MYSTIC_MEDAL_PER_BUY
             )
-            progress += f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.mystic_medals_bought} Mystic Medals)\r"
+            progress += f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.format_number(self.mystic_medals_bought)} Mystic Medals)\n"
         print(progress, end="")
+        self.move_cursor_to_last_line()
 
     def load_image_resources(self):
         """
@@ -208,7 +230,9 @@ class EpicSevenBot:
         to match on the android instance during runtime.
         """
         try:
-            print("Loading the image resources ...", end="\r")
+            self.update_print(
+                Fore.YELLOW + "Loading the image resources ..." + Fore.WHITE
+            )
 
             self.bookmark_image_path = os.path.join(
                 self.current_dir, "image_resources", "bookmark_shop_entry.png"
@@ -248,9 +272,11 @@ class EpicSevenBot:
                 self.in_secret_shop: "Secrect Shop",
             }
 
-            print("Image resources loaded successfully!")
+            print(Fore.GREEN + "Image resources loaded successfully!" + Fore.WHITE)
         except Exception as e:
-            print(f"There was an error loading the resources: {e}")
+            print(
+                Fore.RED + f"There was an error loading the resources: {e}" + Fore.WHITE
+            )
             self.should_continue = False
 
     def connect_to_android(self):
@@ -259,7 +285,7 @@ class EpicSevenBot:
         """
         try:
             # Connect to BlueStacks Emulator that has ADB enabled
-            print("Connecting to Bluestack instance ...", end="\r")
+            self.update_print("Connecting to Bluestack instance ...")
             self.android_instance = u2.connect(f"127.0.0.1:{self.android_port}")
             bluestack_5 = self.android_instance.info
 
@@ -267,18 +293,17 @@ class EpicSevenBot:
                 raise Exception(
                     "Epic Seven is not opened, please try again after opening the app."
                 )
-
-            print("Connected to BlueStacks successfully!")
+            print(Fore.GREEN + "Connected to BlueStacks successfully!")
             return True
 
         except Exception as e:
             if "Invalid version: ''" in e.args:
                 _ = input(
-                    "Please go to your ATX App and click the 启动UIAUTOMATOR button. Press Enter when done: "
+                    "Please go to your ATX App and click the 启动UIAUTOMATOR button. Press any Key when done: "
                 )
                 return self.connect_to_android()
             else:
-                print(f"Failed to connect to BlueStacks: {e}")
+                print(Fore.RED + f"Failed to connect to BlueStacks: {e}" + Fore.WHITE)
                 return False
 
     def extract_numbers_from_image(self, resource_image):
@@ -315,7 +340,7 @@ class EpicSevenBot:
                 # print(f"{self.readable_image_path_name.get(search_image_path, 'Resource')} not found on screen.")
                 return False, 0, 0
         except Exception as e:
-            print(f"There was an error: {e}")
+            print(Fore.RED + f"There was an error: {e}" + Fore.WHITE)
             return False, 0, 0
 
     def buy_resource(self, x, y, resource="bookmark"):
@@ -367,12 +392,8 @@ class EpicSevenBot:
                 numbers[1][1].replace(",", "").replace(" ", "")
             )
         except ValueError:
-            time.sleep(2)
-            numbers = self.extract_numbers_from_image(screenshot_path)
-            self.current_coins = int(numbers[0][1].replace(",", "").replace(" ", ""))
-            self.current_skystones = int(
-                numbers[1][1].replace(",", "").replace(" ", "")
-            )
+            time.sleep(5)
+            self.extract_numbers_from_image(screenshot_path)
         if initial_setup:
             self.initial_amount_coins = self.current_coins
             self.initial_amount_skystones = self.current_skystones
@@ -398,10 +419,16 @@ class EpicSevenBot:
                             self.display_secret_shop_progress()
                     else:
                         self.should_continue = False
-                        print("You don't have any Coins left!")
+                        print(
+                            Fore.MAGENTA + "You don't have any Coins left!" + Fore.WHITE
+                        )
                 else:
                     self.should_continue = False
-                    print(f"Max amount of {self.coins_spent} Coins to spend reached!")
+                    print(
+                        Fore.MAGENTA
+                        + "Max amount of {self.coins_spent} Coins to spend reached!"
+                        + Fore.WHITE
+                    )
         if self.buy_mystic_medals:
             # Search for Mystic Medals
             result, x, y = self.match_android_screen_to_image(
@@ -424,10 +451,16 @@ class EpicSevenBot:
                             self.display_secret_shop_progress()
                     else:
                         self.should_continue = False
-                        print("You don't have any Coins left!")
+                        print(
+                            Fore.MAGENTA + "You don't have any Coins left!" + Fore.WHITE
+                        )
                 else:
                     self.should_continue = False
-                    print(f"Max amount of {self.coins_spent} Coins to spend reached!")
+                    print(
+                        Fore.MAGENTA
+                        + f"Max amount of {self.coins_spent} Coins to spend reached!"
+                        + Fore.WHITE
+                    )
 
     def refresh_store(self):
         """
@@ -462,10 +495,14 @@ class EpicSevenBot:
                         self.display_secret_shop_progress()
             else:
                 self.should_continue = False
-                print("You don't have any Skystones left!")
+                print(Fore.MAGENTA + "You don't have any Skystones left!" + Fore.WHITE)
         else:
             self.should_continue = False
-            print(f"Max amount of {self.skystones_spent} Skystones to spend reached!")
+            print(
+                Fore.MAGENTA
+                + f"Max amount of {self.skystones_spent} Skystones to spend reached!"
+                + Fore.WHITE
+            )
 
     def check_if_inside_secret_shop(self):
         """
@@ -473,19 +510,27 @@ class EpicSevenBot:
         """
         match_found, _, _ = self.match_android_screen_to_image(self.in_secret_shop)
         if not match_found:
-            print("This bot only works inside Garo's Tabern Secret Shop!")
+            print(
+                Fore.RED
+                + "This bot only works inside Garo's Tabern Secret Shop!"
+                + Fore.WHITE
+            )
             _ = input(
-                "Please move to Garo's Tabern Secret Shop and press Enter when done: "
+                "Please move to Garo's Tabern Secret Shop and press"
+                + Fore.GREEN
+                + " Enter "
+                + Fore.WHITE
+                + "when done: "
             )
             self.check_if_inside_secret_shop()
         else:
-            print("Hi Garo, I'll be ordering the usual!")
+            print("Hi Garo, I'll be ordering the usual!\n")
 
     def secret_shop_bot(self):
         """
         This method contains the logic for matching, clicking, buying and refreshing the shop.
         """
-        self.display_secret_shop_progress()
+        self.display_secret_shop_progress(first_display=True)
         while self.should_continue:
             time.sleep(1)
             # To get rid of Heroe Dispatches Returning
@@ -496,7 +541,9 @@ class EpicSevenBot:
             self.android_instance.double_click(1120, 730)
             self.get_resources()
             self.refresh_store()
-        print("The Epic 7 Secret Shop Refresher Bot run has finished. Bye!")
+        print(
+            Fore.WHITE + "The Epic 7 Secret Shop Refresher Bot run has finished. Bye!"
+        )
 
     def get_user_input(
         self,
@@ -506,17 +553,13 @@ class EpicSevenBot:
         default_input=None,
         default_value=None,
         require_positive_integer=False,
-        curse_window=None,
     ):
         """
         This method handles user inputs for an amazing and smooth UX.
         """
-        if not curse_window:
-            curse_window = self.stdscr
         incorrect_input = True
         while incorrect_input:
-            self.crs_print(message=prompt, window=curse_window, new_line=False)
-            user_input = curse_window.getstr().lower().decode("utf-8")
+            user_input = input(prompt).lower()
             # User pressed enter and choose the default value
             if (
                 user_input == ""
@@ -558,35 +601,42 @@ class EpicSevenBot:
         return drive_info
 
     def find_bluestacks_conf(self, available_system_drives):
-        self.crs_print(
-            message="Finding Bluestack Configuration ...",
-            window=self.crs_bluestack_win,
-            should_clear=True,
-        )
-        # probable_paths = [
-        #     "{}Program Files\\BlueStacks_nxt",
-        #     "{}Program Files (x86)\\BlueStacks_nxt",
-        #     "{}ProgramData\\BlueStacks_nxt",
-        #     "{}bluestacks\\BlueStacks_nxt",
-        # ]
+        self.update_print(Fore.WHITE + "Finding Bluestack Configuration ...")
+        probable_paths = [
+            "{}Program Files\\BlueStacks_nxt",
+            "{}Program Files (x86)\\BlueStacks_nxt",
+            "{}ProgramData\\BlueStacks_nxt",
+            "{}bluestacks\\BlueStacks_nxt",
+        ]
 
-        # for drive in available_system_drives:
-        #     for path_template in probable_paths:
-        #         path = path_template.format(drive)
-        #         self.crs_print(message=f"Searching on {path}...", window=self.crs_bluestack_win, should_clear=True)
-        #         if os.path.exists(path):
-        #             conf_path = os.path.join(path, "bluestacks.conf")
-        #             if os.path.exists(conf_path):
-        #                 return conf_path
+        for drive in available_system_drives:
+            for path_template in probable_paths:
+                path = path_template.format(drive)
+                self.update_print(f"Searching on {path}...")
+                if os.path.exists(path):
+                    conf_path = os.path.join(path, "bluestacks.conf")
+                    if os.path.exists(conf_path):
+                        return conf_path
 
         if (
             self.get_user_input(
-                prompt="It seems your local installation of Bluestacks is not on a common place, do you want to search your whole system for it? This may take a while (y/n) [n]:  ",
+                prompt="It seems your local installation of Bluestacks is not on a common place, do you want to search your whole system for it? This may take a while ("
+                + Fore.GREEN
+                + "y"
+                + Fore.WHITE
+                + "/"
+                + Fore.RED
+                + "n"
+                + Fore.WHITE
+                + ") ["
+                + Fore.RED
+                + "n"
+                + Fore.WHITE
+                + "]:  ",
                 prompt_options=["y", "n"],
                 prompt_option_values=[True, False],
                 default_input="n",
                 default_value=False,
-                curse_window=self.crs_bluestack_win,
             )
             is True
         ):
@@ -600,33 +650,22 @@ class EpicSevenBot:
         """
         This method searches the bluestacks.conf for the current port in which ADB is running
         """
-        self.crs_bluestack_win = curses.newwin(5, curses.COLS, 5, 0)
-        self.crs_bluestack_text_win = self.crs_bluestack_win.subwin(
-            3, curses.COLS - 6, 3, 2
-        )
         drive_names = self.get_all_system_drives()
         bluestacks_conf_path = self.find_bluestacks_conf(drive_names)
         if bluestacks_conf_path:
-            self.crs_print(
-                message=f"Found Bluestacks configuration file at {bluestacks_conf_path}",
-                window=self.crs_bluestack_win,
-                should_clear=True,
+            print(
+                Fore.GREEN
+                + f"Found Bluestacks configuration file at {bluestacks_conf_path}"
+                + Fore.WHITE
             )
             with open(bluestacks_conf_path, "r") as file:
                 for line in file:
                     if self.BLUESTACKS_CONF_ADB_PORT_FIELD in line:
                         self.android_port = int(line.split("=")[1].replace('"', ""))
-                        self.crs_print(
-                            message=f"Your ADB port is: {self.android_port}",
-                            window=self.crs_bluestack_win,
-                        )
+                        print(f"Your ADB port is: {self.android_port}")
                         break
         else:
-            self.crs_print(
-                message="Bluestacks configuration file not found.",
-                window=self.crs_bluestack_win,
-                should_clear=True,
-            )
+            print(Fore.RED + "Bluestacks configuration file not found." + Fore.WHITE)
 
     def check_stored_android_port(self):
         """
@@ -641,33 +680,39 @@ class EpicSevenBot:
                     if first_line.startswith("ADB_port="):
                         self.android_port = first_line.split("=")[1]
                         port_found = True
-                        self.crs_print(
-                            message=f"Stored ADB Port found: {self.android_port}",
-                            window=self.crs_bluestack_win,
-                            should_clear=True,
+                        print(
+                            Fore.GREEN
+                            + f"Stored ADB Port found: {self.android_port}"
+                            + Fore.WHITE
                         )
             if not os.path.exists(self.android_port_txt_path) or not port_found:
                 with open(self.android_port_txt_path, "w") as file:
                     should_store_ADB_port = self.get_user_input(
-                        prompt="I see you do not have your ADB port stored yet. You want to store it? (y/n) [y]: ",
+                        prompt="I see you do not have your ADB port stored yet. You want to store it? ("
+                        + Fore.GREEN
+                        + "y"
+                        + Fore.WHITE
+                        + "/"
+                        + Fore.RED
+                        + "n"
+                        + Fore.WHITE
+                        + ") ["
+                        + Fore.GREEN
+                        + "y"
+                        + Fore.WHITE
+                        + "]: ",
                         prompt_options=["y", "n"],
                         prompt_option_values=[True, False],
                         default_input="y",
                         default_value=True,
-                        curse_window=self.crs_bluestack_win,
                     )
                     self.android_port = self.get_user_input(
-                        prompt="\nIn which port is your Android instance ADB running?:  ",
+                        prompt="In which port is your Android instance ADB running?:  ",
                         allow_positive_integer=True,
-                        curse_window=self.crs_bluestack_win,
                     )
                     if should_store_ADB_port:
                         file.write(f"ADB_port={self.android_port}\n")
-                        self.crs_print(
-                            "ADB Port Stored!",
-                            window=self.crs_bluestack_win,
-                            should_clear=True,
-                        )
+                        print(Fore.GREEN + "ADB Port Stored!" + Fore.WHITE)
 
     def get_initial_user_configuration_info(self):
         """
@@ -675,67 +720,102 @@ class EpicSevenBot:
         script runtime decisions returning its position on the android screen.
         """
         self.check_stored_android_port()
-        # next_window_y = self.crs_bluestack_win.getmaxyx()[0] + self.crs_bluestack_win.getbegyx()[0] + 1  # Move one line below the previous window
-        self.crs_initial_conf_win = curses.newwin(5, 10, 14, 0)
         self.buy_bookmarks = self.get_user_input(
-            prompt="Do you want to buy Bookmarks? (y/n) [y]:  ",
+            prompt="Do you want to buy Bookmarks? ("
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "/"
+            + Fore.RED
+            + "n"
+            + Fore.WHITE
+            + ") ["
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "]:  ",
             prompt_options=["y", "n"],
             prompt_option_values=[True, False],
             default_input="y",
             default_value=True,
-            curse_window=self.crs_initial_conf_win,
         )
+        if self.buy_bookmarks:
+            self.variables_to_show_progress.append(self.buy_bookmarks)
         self.buy_mystic_medals = self.get_user_input(
-            prompt="\nDo you want to buy Mystic Medals? (y/n) [y]:  ",
+            prompt="Do you want to buy Mystic Medals? ("
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "/"
+            + Fore.RED
+            + "n"
+            + Fore.WHITE
+            + ") ["
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "]:  ",
             prompt_options=["y", "n"],
             prompt_option_values=[True, False],
             default_input="y",
             default_value=True,
-            curse_window=self.crs_initial_conf_win,
         )
+        if self.buy_mystic_medals:
+            self.variables_to_show_progress.append(self.buy_mystic_medals)
         self.max_amount_skystones_to_spend = self.get_user_input(
-            prompt="\nHow many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
+            prompt="How many Skystones you want to spend? [Empty if you want to use all of your Skystones]:  ",
             default_input="",
             default_value=-1,
             require_positive_integer=True,
-            curse_window=self.crs_initial_conf_win,
         )
-
+        if self.max_amount_skystones_to_spend >= 0:
+            self.variables_to_show_progress.append(self.max_amount_skystones_to_spend)
         self.max_amount_coins_to_spend = self.get_user_input(
-            prompt="\nHow many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
+            prompt="How many Coins you want to spend? [Empty if you want to use all of your Coins]:  ",
             default_input="",
             default_value=-1,
             require_positive_integer=True,
-            curse_window=self.crs_initial_conf_win,
         )
+        if self.max_amount_coins_to_spend >= 0:
+            self.variables_to_show_progress.append(self.max_amount_coins_to_spend)
         self.save_report = self.get_user_input(
-            prompt="\nDo you want to save the shop report upon exit? (y/n) [y]:  ",
+            prompt="Do you want to save the shop report upon exit? ("
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "/"
+            + Fore.RED
+            + "n"
+            + Fore.WHITE
+            + ") ["
+            + Fore.GREEN
+            + "y"
+            + Fore.WHITE
+            + "]:  ",
             prompt_options=["y", "n"],
             prompt_option_values=[True, False],
             default_input="y",
             default_value=True,
-            curse_window=self.crs_initial_conf_win,
         )
 
-    def main(self, stdscr):
-        self.prepare_curses_screen(stdscr)
-        self.crs_print(
-            message="Welcome to the Epic 7 Secret Shop Refresher Bot!\n",
-            message_styling=curses.A_UNDERLINE,
+    def main(self):
+        print(Style.BRIGHT)
+        print(Fore.CYAN + "Welcome to the Epic 7 Secret Shop Refresher Bot!\n")
+        print(
+            Fore.RED
+            + "NOTE: "
+            + Fore.YELLOW
+            + "At any time you can press"
+            + Fore.GREEN
+            + " Ctrl+C"
+            + Fore.YELLOW
+            + " to stop the Bot execution"
         )
-        self.crs_print(
-            message="NOTE: ",
-            message_styling=curses.color_pair(1) | curses.A_BOLD,
-            new_line=False,
-        )
-        self.crs_print("At any time you can press Ctrl+C to stop the Bot execution")
-        self.crs_print(
-            message="NOTE: ",
-            message_styling=curses.color_pair(1) | curses.A_BOLD,
-            new_line=False,
-        )
-        self.crs_print(
-            "Please cancel any pending Dispatch Mission in your High Command to avoid weird behaviors"
+        print(
+            Fore.RED
+            + "NOTE: "
+            + Fore.YELLOW
+            + "Please cancel any pending Dispatch Mission in your High Command to avoid weird behaviors"
         )
         self.get_initial_user_configuration_info()
         self.should_continue = self.connect_to_android()
@@ -746,13 +826,15 @@ class EpicSevenBot:
                 self.update_current_skytones_and_coins(initial_setup=True)
                 self.secret_shop_bot()
             except KeyboardInterrupt:
-                self.crs_print("\nCtrl+C pressed. Exiting gracefully...")
+                print(
+                    Fore.GREEN
+                    + "Ctrl+C"
+                    + Fore.WHITE
+                    + " pressed. Exiting gracefully..."
+                )
             finally:
                 self.show_shopping_report()
-                self.stdscr.getch()
-
-    def run(self):
-        wrapper(self.main)
+                print(Style.RESET_ALL)
 
 
 if __name__ == "__main__":
@@ -768,4 +850,6 @@ if __name__ == "__main__":
     # - We'll hit the Refresh Shop Button if skystones are available then we'll hit confirm
     # - The process continues until either we ran out of money or skystones or the program finishes.
     bot = EpicSevenBot()
-    bot.run()
+    bot.main()
+    # for i in range(100):
+    #     print(bot.display_progress_bar(max_value=100, current_value=i))

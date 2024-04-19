@@ -1848,31 +1848,6 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
-name = "urwid"
-version = "2.6.10"
-description = "A full-featured console (xterm et al.) user interface library"
-optional = false
-python-versions = ">3.7"
-files = [
-    {file = "urwid-2.6.10-py3-none-any.whl", hash = "sha256:f5d290ab01a9cf69a062d5d04ff69111903d41fc14ed03f3ed92cb36f5ef4735"},
-    {file = "urwid-2.6.10.tar.gz", hash = "sha256:ae33355c414c13214e541d3634f3c8a0bfb373914e62ffbcf2fa863527706321"},
-]
-
-[package.dependencies]
-typing-extensions = "*"
-wcwidth = "*"
-
-[package.extras]
-curses = ["windows-curses"]
-glib = ["PyGObject"]
-lcd = ["pyserial"]
-serial = ["pyserial"]
-tornado = ["tornado (>=5.0)"]
-trio = ["exceptiongroup", "trio (>=0.22.0)"]
-twisted = ["twisted"]
-zmq = ["zmq"]
-
-[[package]]
 name = "virtualenv"
 version = "20.25.1"
 description = "Virtual Python Environment builder"
@@ -1893,17 +1868,6 @@ docs = ["furo (>=2023.7.26)", "proselint (>=0.13)", "sphinx (>=7.1.2)", "sphinx-
 test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7)", "packaging (>=23.1)", "pytest (>=7.4)", "pytest-env (>=0.8.2)", "pytest-freezer (>=0.4.8)", "pytest-mock (>=3.11.1)", "pytest-randomly (>=3.12)", "pytest-timeout (>=2.1)", "setuptools (>=68)", "time-machine (>=2.10)"]
 
 [[package]]
-name = "wcwidth"
-version = "0.2.13"
-description = "Measures the displayed width of unicode strings in a terminal"
-optional = false
-python-versions = "*"
-files = [
-    {file = "wcwidth-0.2.13-py2.py3-none-any.whl", hash = "sha256:3da69048e4540d84af32131829ff948f1e022c1c6bdb8d6102117aac784f6859"},
-    {file = "wcwidth-0.2.13.tar.gz", hash = "sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5"},
-]
-
-[[package]]
 name = "whichcraft"
 version = "0.6.1"
 description = "This package provides cross-platform cross-python shutil.which functionality."
@@ -1912,29 +1876,6 @@ python-versions = "*"
 files = [
     {file = "whichcraft-0.6.1-py2.py3-none-any.whl", hash = "sha256:deda9266fbb22b8c64fd3ee45c050d61139cd87419765f588e37c8d23e236dd9"},
     {file = "whichcraft-0.6.1.tar.gz", hash = "sha256:acdbb91b63d6a15efbd6430d1d7b2d36e44a71697e93e19b7ded477afd9fce87"},
-]
-
-[[package]]
-name = "windows-curses"
-version = "2.3.2"
-description = "Support for the standard curses module on Windows"
-optional = false
-python-versions = "*"
-files = [
-    {file = "windows_curses-2.3.2-cp310-cp310-win32.whl", hash = "sha256:0286d35c9a2589731af3cf2b1251635a400f4b61aef2b9c081f6c98e7887a170"},
-    {file = "windows_curses-2.3.2-cp310-cp310-win_amd64.whl", hash = "sha256:b5e68520c7e92dff72914e4126cadb5b8eb3b6c968d955de6d35ff42306da8c0"},
-    {file = "windows_curses-2.3.2-cp311-cp311-win32.whl", hash = "sha256:95d2a288af6172270da5ca9225aa99eeae98595c6e90f3574aa9b9f2fc1d2619"},
-    {file = "windows_curses-2.3.2-cp311-cp311-win_amd64.whl", hash = "sha256:9b7ecd0f21f643e22a979effff25f62200626bb9853ea8b9aacf0bbcaab0950d"},
-    {file = "windows_curses-2.3.2-cp312-cp312-win32.whl", hash = "sha256:4546122f5bec2fb46c1706c020d971bcfc4d9a5158372f25ba7472a834b0f165"},
-    {file = "windows_curses-2.3.2-cp312-cp312-win_amd64.whl", hash = "sha256:e3f27939f39143c513f444a8c0419b2737e8de55fbe5d63d765992512125366d"},
-    {file = "windows_curses-2.3.2-cp36-cp36m-win32.whl", hash = "sha256:a570f744a62108d024a7775b3b156b2ae2380fc971237c3bd2742341e7151f22"},
-    {file = "windows_curses-2.3.2-cp36-cp36m-win_amd64.whl", hash = "sha256:f81294465a67e43ddc50c1b52711b100b002fa1238f87d84d0cf94b785c4fe75"},
-    {file = "windows_curses-2.3.2-cp37-cp37m-win32.whl", hash = "sha256:72ff5d8963fbb3aa662bfced2c5ea22dc3ed58bac827a3bff74a1de5eacdbe57"},
-    {file = "windows_curses-2.3.2-cp37-cp37m-win_amd64.whl", hash = "sha256:70d8cb4ddad43f695a266f79c7a31d40ac8aee2a17cf8e06ecfd4a71589ad30d"},
-    {file = "windows_curses-2.3.2-cp38-cp38-win32.whl", hash = "sha256:6bc698058081408685975256f46f570c32f8d7e1f4f82f9d6c66c300c6daff89"},
-    {file = "windows_curses-2.3.2-cp38-cp38-win_amd64.whl", hash = "sha256:f73bfd283f86d3ac0a72b74307ccc99ea0fd008a732d80db95d31fbafeee3c66"},
-    {file = "windows_curses-2.3.2-cp39-cp39-win32.whl", hash = "sha256:e4ec5245f0c00ede45b033a885511eea80d5928c9bd3ceb523fbfb086370a4df"},
-    {file = "windows_curses-2.3.2-cp39-cp39-win_amd64.whl", hash = "sha256:00d5d000b68db38bd97b6a5b90ee4b4c915a7cef7492fc5aa9ecc7794ee2ca93"},
 ]
 
 [[package]]
@@ -2030,4 +1971,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "09baebd1277aba70904887e4454024d4af349be34222f456a4e2ab158075a446"
+content-hash = "fa8108128a3517042644f29eef2eba881b1f7d4d67bd17724419163087833751"

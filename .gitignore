@@ -165,3 +165,5 @@ e7shop_refresher/image_resources/resources_screenshot.png
 test_colorama.py
 test_main_urwid.py
 test_urwid.py
+inno_setup_file.iss
+Output/

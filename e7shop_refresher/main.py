@@ -1,7 +1,6 @@
+import curses
 import datetime
 import os
-import shutil
-import sys
 import time
 
 import cv2
@@ -16,6 +15,9 @@ class EpicSevenBot:
     def __init__(self):
         # Bluestacks 5 Path
         self.BLUESTACKS_CONF_ADB_PORT_FIELD = "bst.instance.Pie64.status.adb_port"
+
+        # Initialize Curses
+        self.stdscr = None
 
         # Initialize Colorama
         init()
@@ -60,19 +62,16 @@ class EpicSevenBot:
         self.initial_amount_skystones = 0
         self.initial_amount_coins = 0
 
-    def move_cursor_to_last_line(self):
-        # Get the size of the terminal window
-        rows, _ = shutil.get_terminal_size()
-        # Move the cursor to the last line
-        sys.stdout.write(f"\033[{rows};0H")
-
-    def overwrite_last_lines(self, lines_to_overwrite):
-        sys.stdout.write("\033[F" * lines_to_overwrite)  # Move cursor up
-
     def update_print(self, message):
+        """
+        A cleaner way of using the 'r' escape character on prints
+        """
         print("\033[K" + message, end="\r")
 
     def write_to_file_and_console(self, content, filename):
+        """
+        A method to both print on console and on a file for users to review after
+        """
         # Write content to console
         print(content)
         if self.save_report:
@@ -81,6 +80,9 @@ class EpicSevenBot:
                 file.write(content + "\n")
 
     def format_number(self, number):
+        """
+        A method to add ',' to easily differentiate big numbers.
+        """
         num_str = str(number)
         result = ""
         for i in range(len(num_str) - 1, -1, -1):
@@ -173,7 +175,12 @@ class EpicSevenBot:
             "-----------------------------------------------------------", filename
         )
 
-    def display_progress_bar(self, max_value, current_value, increment_by=1):
+    def display_progress_bar(
+        self, max_value, current_value, increment_by=1, should_curse=False
+    ):
+        """
+        A method to handle showing a progress bar based on completion percentage.
+        """
         percentage = (
             int((current_value / max_value) * 100)
             if max_value > current_value + increment_by
@@ -181,48 +188,98 @@ class EpicSevenBot:
         )
         bar = f"[{'=' * percentage}{'>' if percentage < 100 else '='}{' ' * (100 - percentage)}] {percentage}%\n"
         if percentage < 20:
-            return Fore.LIGHTRED_EX + bar + Fore.WHITE
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(1) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTRED_EX + bar + Fore.WHITE
+            )
         elif percentage < 40:
-            return Fore.LIGHTMAGENTA_EX + bar + Fore.WHITE
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(2) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTMAGENTA_EX + bar + Fore.WHITE
+            )
         elif percentage < 60:
-            return Fore.LIGHTBLUE_EX + bar + Fore.WHITE
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(3) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTBLUE_EX + bar + Fore.WHITE
+            )
         elif percentage < 80:
-            return Fore.LIGHTCYAN_EX + bar + Fore.WHITE
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(4) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTCYAN_EX + bar + Fore.WHITE
+            )
         elif percentage >= 80 and percentage < 100:
-            return Fore.LIGHTYELLOW_EX + bar + Fore.WHITE
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(5) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTYELLOW_EX + bar + Fore.WHITE
+            )
         elif percentage == 100:
-            return Fore.LIGHTGREEN_EX + bar + Fore.WHITE
-
-    def display_secret_shop_progress(self, first_display=False):
-        if not first_display:
-            progress_bar_line = 0
-            if self.max_amount_skystones_to_spend != -1:
-                progress_bar_line += 1
-            if self.max_amount_coins_to_spend != -1:
-                progress_bar_line += 1
-            self.overwrite_last_lines(
-                len(self.variables_to_show_progress) + progress_bar_line
+            return (
+                self.stdscr.addstr(bar, curses.color_pair(6) | curses.A_BOLD)
+                if should_curse
+                else Fore.LIGHTGREEN_EX + bar + Fore.WHITE
             )
 
-        progress = ""
+    def display_secret_shop_progress(self, first_display=False):
+        """
+        A method for the users to see how the shopping is going.
+        Displaying Skystones & Coins Spent, Bookmarks & Mystic Medals Spent.
+        """
+        if first_display:
+            # Initialize Curses
+            self.stdscr = curses.initscr()
+            curses.noecho()
+            curses.cbreak()
+            self.stdscr.keypad(True)
+            curses.start_color()
+            curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+            curses.init_pair(2, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+            curses.init_pair(3, curses.COLOR_BLUE, curses.COLOR_BLACK)
+            curses.init_pair(4, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            curses.init_pair(6, curses.COLOR_GREEN, curses.COLOR_BLACK)
+
+        self.stdscr.clear()
         if self.max_amount_skystones_to_spend != -1:
-            progress += f"Amount of Skystones spent: {self.format_number(self.skystones_spent)} out of {self.format_number(self.max_amount_skystones_to_spend)}\n"
-            progress += f"{self.display_progress_bar(max_value=self.max_amount_skystones_to_spend, current_value=self.skystones_spent)}"
+            self.stdscr.addstr(
+                f"Amount of Skystones spent: {self.format_number(self.skystones_spent)} out of {self.format_number(self.max_amount_skystones_to_spend)}\n",
+                curses.A_BOLD,
+            )
+            self.display_progress_bar(
+                max_value=self.max_amount_skystones_to_spend,
+                current_value=self.skystones_spent,
+                should_curse=True,
+            )
         if self.max_amount_coins_to_spend != -1:
-            progress += f"Amount of Coins spent: {self.format_number(self.coins_spent)} out of {self.format_number(self.max_amount_coins_to_spend)}\n"
-            progress += f"{self.display_progress_bar(max_value=self.max_amount_coins_to_spend, current_value=self.coins_spent)}"
+            self.stdscr.addstr(
+                f"Amount of Coins spent: {self.format_number(self.coins_spent)} out of {self.format_number(self.max_amount_coins_to_spend)}\n",
+                curses.A_BOLD,
+            )
+            self.display_progress_bar(
+                max_value=self.max_amount_coins_to_spend,
+                current_value=self.coins_spent,
+                should_curse=True,
+            )
         if self.buy_bookmarks:
             final_amount_bookmarks = (
                 self.bookmarks_bought // self.AMOUNT_BOOKMARK_PER_BUY
             )
-            progress += f"Bookmarks Bought: {final_amount_bookmarks} ({self.format_number(self.bookmarks_bought)} Bookmarks)\n"
+            self.stdscr.addstr(
+                f"Bookmarks Bought: {final_amount_bookmarks} ({self.format_number(self.bookmarks_bought)} Bookmarks)\n"
+            )
         if self.buy_mystic_medals:
             final_amount_mystic_medals = (
                 self.mystic_medals_bought // self.AMOUNT_MYSTIC_MEDAL_PER_BUY
             )
-            progress += f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.format_number(self.mystic_medals_bought)} Mystic Medals)\n"
-        print(progress, end="")
-        self.move_cursor_to_last_line()
+            self.stdscr.addstr(
+                f"Mystic Medals Bought: {final_amount_mystic_medals} ({self.format_number(self.mystic_medals_bought)} Mystic Medals)\n"
+            )
+
+        self.stdscr.refresh()
 
     def load_image_resources(self):
         """
@@ -833,6 +890,10 @@ class EpicSevenBot:
                     + " pressed. Exiting gracefully..."
                 )
             finally:
+                curses.nocbreak()
+                self.stdscr.keypad(False)
+                curses.echo()
+                curses.endwin()
                 self.show_shopping_report()
                 print(Style.RESET_ALL)
 
